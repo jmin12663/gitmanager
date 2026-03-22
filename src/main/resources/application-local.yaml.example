@@ -1,0 +1,13 @@
+spring:
+  datasource:
+    username: capstone
+    password: 1234
+  mail:
+    username: jmin12663@gmail.com
+    password: nenp inrn gmrx muxa
+
+jwt:
+  secret: 2026capstoneprojectgitmanager001
+
+aes:
+  secret-key: 2026capstoneprojectgitmanager001

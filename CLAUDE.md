@@ -1,0 +1,346 @@
+# CLAUDE.md — AI Agent 지시서
+
+> 이 파일은 Claude Code가 매 작업마다 자동으로 읽는 컨텍스트야.
+> 코드를 생성하기 전에 반드시 이 파일 전체를 숙지해.
+> 세부 계획은 CAPSTONE_PLAN.md, ERD는 docs/ERD.md, API 명세는 docs/API.md 참조.
+
+---
+
+## 1. 프로젝트 개요
+
+Git 연동 팀 협업 관리 플랫폼. (한 개 프로젝트에 단일 repo 기준)
+GitHub를 쓰다 보면 누가 뭘 하는지, 진행 상황이 어떤지 파악이 어렵다는 문제를 해결.
+디스코드처럼 왼쪽 사이드바에서 프로젝트를 선택하면 해당 프로젝트의 Board / 캘린더 / 대시보드로 전환되는 구조.
+
+**핵심 기능 7가지 (구현 순서)**
+1. 회원 관리 (JWT 인증 — 모든 기능의 기반)
+2. 팀 프로젝트 관리 (사이드바 구조, 6자리 초대 코드)
+3. 개인 ToDo 리스트
+4. Develop Board (칸반 + GitHub 자동 연동)
+5. GitHub Webhook 연동
+6. 개발 일정 관리 캘린더
+7. 프로젝트 대시보드
+
+---
+
+## 2. 기술 스택
+
+```
+Backend  : Spring Boot 3.5.12, Spring Security, JPA (Hibernate)
+Auth     : JWT (Access Token + Refresh Token), BCrypt
+Database : MySQL (로컬) / AWS RDS (배포)
+Storage  : AWS S3 (서버 중계 방식 이미지 업로드)
+Deploy   : Docker + AWS EC2
+Frontend : React
+Libs     : FullCalendar (캘린더), Chart.js (차트), @dnd-kit/core (드래그앤드롭)
+Email    : Gmail SMTP (회원가입 인증 전용)
+```
+
+---
+
+## 3. 코딩 규칙 — 반드시 따를 것
+
+### 패키지 구조
+기능별 패키지로 분리. 절대 계층형(controller/service/repository 최상위)으로 만들지 말 것.
+
+```
+com.capstone.gitmanager
+├── auth/
+│   ├── controller/
+│   ├── service/
+│   ├── repository/
+│   ├── dto/
+│   └── entity/
+├── project/
+├── todo/
+├── board/
+├── github/
+├── calendar/
+├── dashboard/
+└── common/
+    ├── config/        (SecurityConfig, JwtConfig, CorsConfig 등)
+    ├── exception/     (GlobalExceptionHandler)
+    └── util/
+```
+
+### Entity 작성 규칙
+- 모든 Entity는 `BaseEntity` 상속 (createdAt, updatedAt 자동 관리)
+- `@NoArgsConstructor(access = PROTECTED)` 필수
+- 연관관계 편의 메서드는 Entity 안에 작성
+- Lombok 사용: `@Getter`만. `@Setter` 절대 금지
+- `@ToString`에 연관관계 필드 제외 (`exclude` 사용)
+
+```java
+// BaseEntity 예시
+@MappedSuperclass
+@EntityListeners(AuditingEntityListener.class)
+public abstract class BaseEntity {
+    @CreatedDate
+    private LocalDateTime createdAt;
+    @LastModifiedDate
+    private LocalDateTime updatedAt;
+}
+```
+
+### DTO 규칙
+- Request DTO: `@Valid` 어노테이션으로 검증
+- Response DTO: `record` 사용 권장
+- Entity ↔ DTO 변환은 DTO 안에 `from()` 정적 메서드로 처리
+- Entity를 Controller까지 올리지 말 것
+
+```java
+// Response DTO 예시
+public record ProjectResponse(
+    Long id,
+    String name,
+    String description
+) {
+    public static ProjectResponse from(Project project) {
+        return new ProjectResponse(project.getId(), project.getName(), project.getDescription());
+    }
+}
+```
+
+### Service 규칙
+- `@Transactional(readOnly = true)` 기본, 쓰기 작업만 `@Transactional`
+- 비즈니스 로직은 Service에만. Controller는 DTO 변환과 응답 반환만
+- 예외는 커스텀 예외 클래스 사용 (`CustomException` + `ErrorCode` enum)
+
+### API 응답 형식
+모든 API는 아래 형식으로 통일. 절대 다른 형식 쓰지 말 것.
+
+```json
+// 성공
+{
+  "success": true,
+  "data": { ... }
+}
+
+// 실패
+{
+  "success": false,
+  "error": {
+    "code": "USER_NOT_FOUND",
+    "message": "사용자를 찾을 수 없습니다."
+  }
+}
+```
+
+```java
+// ApiResponse 클래스
+public record ApiResponse<T>(boolean success, T data, ErrorResponse error) {
+    public static <T> ApiResponse<T> ok(T data) {
+        return new ApiResponse<>(true, data, null);
+    }
+    public static ApiResponse<?> fail(ErrorCode code) {
+        return new ApiResponse<>(false, null, new ErrorResponse(code));
+    }
+}
+```
+
+### Security 규칙
+- JWT 검증은 `JwtAuthenticationFilter`에서만 처리
+- `SecurityConfig`에서 permitAll 경로 명시적으로 관리
+- Webhook 엔드포인트(`/api/webhook/**`)는 JWT 인증 제외, GitHub Secret으로 검증
+- REST API이므로 `SecurityConfig`에서 CSRF 비활성화 (`csrf.disable()`)
+  → Refresh Token httpOnly 쿠키 방식은 CSRF 위험이 있으나, 쿠키를 직접 읽는 코드가 없고
+    요청 본문/헤더에 Access Token 검증이 병행되므로 REST API 한정 disable 처리
+
+### React 연동 규칙
+- 백엔드: REST API 전용 (View 렌더링 없음, `@RestController`만 사용)
+- CORS 전역 설정 (WebMvcConfigurer)
+  → 허용 Origin: http://localhost:3000 (개발) / 배포 도메인 (배포)
+- JWT 저장 방식
+  → Access Token: React 메모리(변수) 저장
+  → Refresh Token: httpOnly 쿠키 저장 (XSS 방어)
+
+### 네이밍 규칙
+- API URL: 소문자 + 하이픈 (`/api/project-members`)
+- 변수/메서드: camelCase
+- 상수: UPPER_SNAKE_CASE
+- 테이블명: snake_case 복수형 (`users`, `commit_logs`)
+
+---
+
+## 4. 핵심 도메인 로직 — 반드시 숙지
+
+### Board 카드 ↔ GitHub branch 연동 구조
+```
+cards         : id, project_id, title, status, assignee_id, due_date, memo, image_url, is_deleted, created_by, merged_at
+card_branch   : card_id, branch_name, repo_name, created_at  ← 복합 PK(card_id, branch_name)
+commit_logs   : id, card_id, commit_sha UNIQUE, message, author, committed_at
+```
+
+**카드 생성 — 두 가지 진입점**
+- 진입점 A (카드 먼저): 팀원이 카드 생성 → branch 이름 연결 → Webhook으로 자동 갱신
+- 진입점 B (branch 먼저): GitHub branch 생성 Webhook 수신 → 미연결 카드 자동 생성
+
+**카드 상태 자동 전환 규칙**
+- branch 생성 Webhook → 미연결 카드 자동 생성 (status: TODO)
+- branch에 commit push → 연결된 카드 status: IN_PROGRESS 로 변경
+- main branch로 merge → 연결된 카드 status: DONE 으로 변경 + merge 시간 기록
+
+**Webhook 처리 로직**
+```
+POST /api/webhook/github 수신
+→ X-Hub-Signature-256 헤더로 GitHub Secret 검증 (검증 실패 시 403)
+→ event 타입 분기
+   └── "create" (branch 생성): card_branch 조회 → 없으면 미연결 카드 생성
+   └── "push"  (commit push) : branch_name으로 카드 조회 → IN_PROGRESS 전환 + commit_logs 저장
+                               commit_sha UNIQUE 제약으로 중복 수신 방지
+   └── "pull_request" (merge): merged=true 확인 → DONE 전환 + merge 시간 기록
+```
+
+### JWT 인증 흐름
+```
+로그인 → Access Token (1시간) + Refresh Token (7일) 발급
+→ 모든 요청 헤더: Authorization: Bearer {accessToken}
+→ Access Token 만료 시 → POST /api/auth/refresh 로 갱신
+  1차: 만료 여부만 검증
+  2차 (8주차 이후): RTR 적용 — RT 사용 시 새 RT 발급 + 기존 RT 즉시 무효화
+→ Refresh Token도 만료 시 → 재로그인
+```
+
+### 프로젝트 ↔ 유저 다대다
+```
+user_project: user_id, project_id, role (OWNER / MEMBER)
+→ 사이드바 조회: SELECT projects WHERE user_id = :userId
+→ OWNER만 프로젝트 삭제 / 팀원 강퇴 가능
+```
+
+### 팀원 초대 (초대 코드 방식)
+```
+프로젝트 생성 시 6자리 랜덤 초대 코드 자동 발급
+→ projects 테이블: invite_code UNIQUE 컬럼
+→ OWNER만 코드 조회/재발급 가능
+→ 팀원이 코드 입력 시 user_project에 MEMBER로 추가
+```
+
+### 이미지 업로드 (서버 중계 방식)
+```
+React → 서버로 이미지 전송
+→ 서버가 S3에 업로드
+→ S3 URL을 DB cards 테이블 image_url에 저장
+- 허용 확장자: jpg, jpeg, png, gif
+- 파일 크기 제한: 10MB
+- S3 버킷 경로: cards/{card_id}/{filename}
+```
+
+### Soft Delete 전략
+```
+카드, 댓글 삭제 시 is_deleted = true 처리
+JPA @SQLRestriction("is_deleted = false") 자동 필터링
+연결된 commit_logs, comment 보존
+```
+
+---
+
+## 5. DB 핵심 테이블 구조
+
+```sql
+-- 회원 (created_at, updated_at은 BaseEntity가 자동 관리)
+users: id, email, password, name, email_verified
+
+-- 이메일 인증 토큰 (회원가입 시 발급, 인증 완료 후 삭제)
+email_verification_tokens: id, user_id, token, expires_at, created_at
+
+-- Refresh Token (1차: is_used 미사용, 8주차 RTR 적용 시 활성화)
+refresh_tokens: id, user_id, token_hash, is_used, expires_at, created_at
+
+-- 프로젝트
+projects: id, name, description, start_date, end_date, created_by, invite_code UNIQUE
+
+-- 유저-프로젝트 (다대다, 복합 PK)
+user_project: user_id, project_id, role (OWNER/MEMBER)
+  PRIMARY KEY (user_id, project_id)
+
+-- GitHub 연동 (project_id가 PK이자 FK, PAT는 AES-256-CBC 암호화, 키는 환경변수 AES_SECRET_KEY)
+project_github: project_id, repo_url, repo_name, pat_encrypted, webhook_secret
+  PRIMARY KEY (project_id)
+
+-- Board 카드
+cards: id, project_id, title, status (TODO/IN_PROGRESS/DONE), assignee_id, due_date, memo, image_url, is_deleted, created_by, merged_at
+
+-- 카드-branch 연결 (1:N, 복합 PK)
+card_branch: card_id, branch_name, repo_name, created_at
+  PRIMARY KEY (card_id, branch_name)
+
+-- commit 이력 (commit_sha UNIQUE → 중복 수신 방지)
+commit_logs: id, card_id, commit_sha UNIQUE, message, author, committed_at
+
+-- 댓글
+comments: id, card_id, user_id, content, created_at, is_deleted
+
+-- 일정
+schedules: id, project_id, title, start_date, end_date, created_by, card_id(nullable)
+
+-- ToDo
+todos: id, user_id, content, is_done, created_at
+```
+
+---
+
+## 6. 현재 구현 상태
+
+> 작업 완료 시 이 섹션을 직접 업데이트해.
+
+- [x] 프로젝트 세팅 (Spring Boot 3.5.12, MySQL 연결)
+- [ ] BaseEntity, ApiResponse, GlobalExceptionHandler 공통 클래스
+- [ ] CORS 설정 (WebMvcConfigurer)
+- [ ] 기능 1: 회원 관리 + JWT (1차: RT 저장/만료 검증)
+- [ ] 기능 2: 팀 프로젝트 관리 (초대 코드 방식)
+- [ ] 기능 3: 개인 ToDo
+- [ ] 기능 4: Develop Board
+- [ ] 기능 5: GitHub Webhook 연동
+- [ ] 기능 1 (2차): RTR 추가 적용
+- [ ] 기능 6: 캘린더
+- [ ] 기능 7: 대시보드
+- [ ] Docker 빌드
+- [ ] AWS 배포
+
+---
+
+## 7. Claude Code 작업 요청 방법
+
+### 초기 세팅
+```
+CLAUDE.md의 패키지 구조, Entity 규칙, ApiResponse 형식 그대로 적용해서
+Spring Boot 프로젝트 초기 세팅해줘.
+build.gradle 의존성도 기술 스택에 맞게 작성해줘.
+```
+
+### 기능 구현 (순서대로 진행)
+```
+CLAUDE.md와 CAPSTONE_PLAN.md 참고해서 기능 1 (회원 관리) 전체 구현해줘.
+auth 패키지 아래 entity, repository, service, controller, dto 전부 작성해줘.
+
+CLAUDE.md 규칙 지키면서 기능 4 (Develop Board) 구현해줘.
+cards, card_branch, commit_logs 테이블 기반으로 작성해줘.
+
+CLAUDE.md의 Webhook 처리 로직대로 /api/webhook/github 엔드포인트 구현해줘.
+```
+
+### 보안 관련
+```
+CLAUDE.md의 JWT 1차 구현 (RT 저장 + 만료 검증)해줘.
+CLAUDE.md의 Webhook X-Hub-Signature-256 서명 검증 필터를 구현해줘.
+PAT AES-256-CBC 암호화/복호화 유틸 클래스 구현해줘 (키는 환경변수 AES_SECRET_KEY).
+```
+
+### 공통 구현
+```
+CLAUDE.md 기준으로 ApiResponse 래퍼와 GlobalExceptionHandler를 구현해줘.
+card, comment 엔티티에 Soft Delete(@SQLRestriction is_deleted=false) 적용해줘.
+CORS 전역 설정 (WebMvcConfigurer) 구현해줘. Origin: http://localhost:3000
+```
+
+### 디버깅 / 수정
+```
+CLAUDE.md 규칙 기준으로 현재 코드 리뷰해줘.
+ApiResponse 형식 안 맞는 부분 찾아서 수정해줘.
+```
+
+### 진행 상황 업데이트
+```
+기능 1 구현 완료했어. CLAUDE.md 6번 섹션 체크박스 업데이트해줘.
+```

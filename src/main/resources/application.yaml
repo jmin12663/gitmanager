@@ -1,0 +1,30 @@
+spring:
+  application:
+    name: gitmanager
+  profiles:
+    include: local
+  datasource:
+    url: jdbc:mysql://localhost:3306/gitmanager?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    hibernate:
+      ddl-auto: create
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    properties:
+      mail.smtp.auth: true
+      mail.smtp.starttls.enable: true
+
+jwt:
+  access-expiration: 3600000
+  refresh-expiration: 604800000
+
+server:
+  port: 8080
