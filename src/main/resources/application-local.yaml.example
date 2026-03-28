@@ -9,5 +9,6 @@ spring:
 jwt:
   secret: 2026capstoneprojectgitmanager001
 
-aes:
-  secret-key: 2026capstoneprojectgitmanager001
+jasypt:
+  encryptor:
+    password: 2026capstoneprojectgitmanager001

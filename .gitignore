@@ -38,6 +38,7 @@ out/
 
 ### Sensitive config ###
 src/main/resources/application-local.yaml
+src/main/resources/application-local.yaml.example
 src/main/resources/application-prod.yaml
 src/main/resources/application-aws.yaml
 src/main/resources/application-secret.yaml
