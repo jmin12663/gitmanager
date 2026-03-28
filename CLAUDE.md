@@ -34,6 +34,7 @@ Deploy   : Docker + AWS EC2
 Frontend : React
 Libs     : FullCalendar (캘린더), Chart.js (차트), @dnd-kit/core (드래그앤드롭)
 Email    : Gmail SMTP (회원가입 인증 전용)
+Encrypt  : Jasypt (PAT 암호화 — 알고리즘: PBEWITHHMACSHA512ANDAES_256)
 ```
 
 ---
@@ -143,8 +144,16 @@ public record ApiResponse<T>(boolean success, T data, ErrorResponse error) {
 - `SecurityConfig`에서 permitAll 경로 명시적으로 관리
 - Webhook 엔드포인트(`/api/webhook/**`)는 JWT 인증 제외, GitHub Secret으로 검증
 - REST API이므로 `SecurityConfig`에서 CSRF 비활성화 (`csrf.disable()`)
-  → Refresh Token httpOnly 쿠키 방식은 CSRF 위험이 있으나, 쿠키를 직접 읽는 코드가 없고
-    요청 본문/헤더에 Access Token 검증이 병행되므로 REST API 한정 disable 처리
+- GitHub PAT 암호화: Jasypt `StringEncryptor` 사용
+  → 알고리즘: `PBEWITHHMACSHA512ANDAES_256` (반드시 명시, 기본값 DES는 취약)
+  → 암호화 키: 환경변수 `AES_SECRET_KEY` 로 주입 (로컬: `.env`, 배포: EC2 환경변수)
+  ```yaml
+  jasypt:
+    encryptor:
+      password: ${AES_SECRET_KEY}
+      algorithm: PBEWITHHMACSHA512ANDAES_256
+      iv-generator-classname: org.jasypt.iv.RandomIvGenerator
+  ```
 
 ### React 연동 규칙
 - 백엔드: REST API 전용 (View 렌더링 없음, `@RestController`만 사용)
@@ -254,7 +263,7 @@ projects: id, name, description, start_date, end_date, created_by, invite_code U
 user_project: user_id, project_id, role (OWNER/MEMBER)
   PRIMARY KEY (user_id, project_id)
 
--- GitHub 연동 (project_id가 PK이자 FK, PAT는 AES-256-CBC 암호화, 키는 환경변수 AES_SECRET_KEY)
+-- GitHub 연동 (project_id가 PK이자 FK, PAT는 Jasypt 암호화, 키는 환경변수 AES_SECRET_KEY)
 project_github: project_id, repo_url, repo_name, pat_encrypted, webhook_secret
   PRIMARY KEY (project_id)
 
@@ -299,48 +308,3 @@ todos: id, user_id, content, is_done, created_at
 - [ ] AWS 배포
 
 ---
-
-## 7. Claude Code 작업 요청 방법
-
-### 초기 세팅
-```
-CLAUDE.md의 패키지 구조, Entity 규칙, ApiResponse 형식 그대로 적용해서
-Spring Boot 프로젝트 초기 세팅해줘.
-build.gradle 의존성도 기술 스택에 맞게 작성해줘.
-```
-
-### 기능 구현 (순서대로 진행)
-```
-CLAUDE.md와 CAPSTONE_PLAN.md 참고해서 기능 1 (회원 관리) 전체 구현해줘.
-auth 패키지 아래 entity, repository, service, controller, dto 전부 작성해줘.
-
-CLAUDE.md 규칙 지키면서 기능 4 (Develop Board) 구현해줘.
-cards, card_branch, commit_logs 테이블 기반으로 작성해줘.
-
-CLAUDE.md의 Webhook 처리 로직대로 /api/webhook/github 엔드포인트 구현해줘.
-```
-
-### 보안 관련
-```
-CLAUDE.md의 JWT 1차 구현 (RT 저장 + 만료 검증)해줘.
-CLAUDE.md의 Webhook X-Hub-Signature-256 서명 검증 필터를 구현해줘.
-PAT AES-256-CBC 암호화/복호화 유틸 클래스 구현해줘 (키는 환경변수 AES_SECRET_KEY).
-```
-
-### 공통 구현
-```
-CLAUDE.md 기준으로 ApiResponse 래퍼와 GlobalExceptionHandler를 구현해줘.
-card, comment 엔티티에 Soft Delete(@SQLRestriction is_deleted=false) 적용해줘.
-CORS 전역 설정 (WebMvcConfigurer) 구현해줘. Origin: http://localhost:3000
-```
-
-### 디버깅 / 수정
-```
-CLAUDE.md 규칙 기준으로 현재 코드 리뷰해줘.
-ApiResponse 형식 안 맞는 부분 찾아서 수정해줘.
-```
-
-### 진행 상황 업데이트
-```
-기능 1 구현 완료했어. CLAUDE.md 6번 섹션 체크박스 업데이트해줘.
-```

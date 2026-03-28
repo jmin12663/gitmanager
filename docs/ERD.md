@@ -86,7 +86,7 @@ CREATE TABLE user_project (
 );
 
 -- GitHub 연동 (project_id 가 PK 이자 FK → 프로젝트당 1개)
--- pat_encrypted: AES-256-CBC 암호화, 키는 환경변수 AES_SECRET_KEY
+-- pat_encrypted: Jasypt 암호화 (PBEWITHHMACSHA512ANDAES_256), 키는 환경변수 AES_SECRET_KEY
 CREATE TABLE project_github (
     project_id     BIGINT       NOT NULL,
     repo_url       VARCHAR(255) NOT NULL,
@@ -204,4 +204,4 @@ CREATE TABLE todos (
 | `user_project.role` OWNER/MEMBER | 초대 코드 조회·재발급, 팀원 강퇴 권한 분리 |
 | `schedules.card_id` nullable | 카드 마감일 자동 연동 + 독립 일정 모두 수용 |
 | `refresh_tokens.is_used` | 1차 미사용, 8주차 RTR 적용 시 활성화 |
-| `pat_encrypted` AES-256-CBC | PAT 평문 저장 금지, 키는 환경변수 `AES_SECRET_KEY` |
+| `pat_encrypted` Jasypt 암호화 | PAT 평문 저장 금지, 키는 환경변수 `AES_SECRET_KEY` |
