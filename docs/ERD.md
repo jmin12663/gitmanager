@@ -26,6 +26,7 @@ cards (1) ──────────────── (0..1) schedules  (du
 -- 회원 (created_at, updated_at 은 BaseEntity 자동 관리)
 CREATE TABLE users (
     id             BIGINT       NOT NULL AUTO_INCREMENT,
+    login_id       VARCHAR(20)  NOT NULL UNIQUE,
     email          VARCHAR(255) NOT NULL UNIQUE,
     password       VARCHAR(255) NOT NULL,
     name           VARCHAR(100) NOT NULL,

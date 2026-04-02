@@ -1,4 +1,4 @@
- ㅇ# Code Explanation
+# Code Explanation
 
 > 구현된 파일에 대한 설명을 누적합니다. `/exp-code` 명령으로 업데이트됩니다.
 
