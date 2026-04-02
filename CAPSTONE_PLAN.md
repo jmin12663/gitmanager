@@ -9,7 +9,7 @@
 **취지**: GitHub를 사용하다 보면 작업 진행 상황, 담당자, 다음에 할 일이 파악하기 어려움.
 이를 해결하기 위한 Git 연동 팀 협업 관리 플랫폼.(한 개 프로젝트에 단일 repo 기준)
 
-**기간**: 2025년 3월 23일~ 6월 6일 (11주)
+**기간**: 2026년 3월 23일~ 6월 6일 (11주)
 
 **목표**: 취업 포트폴리오 + 학교 캡스톤 과제
 
@@ -339,7 +339,7 @@ GET /api/projects/{id}/dashboard    대시보드 전체 데이터 조회
 
 ```sql
 -- 회원 (created_at, updated_at은 BaseEntity가 자동 관리)
-users: id, email, password, name, email_verified
+users: id, login_id UNIQUE, email UNIQUE, password, name, email_verified
 
 -- 이메일 인증 토큰 (회원가입 시 발급, 인증 완료 후 삭제)
 email_verification_tokens: id, user_id, token, expires_at, created_at

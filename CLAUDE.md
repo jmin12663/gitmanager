@@ -4,6 +4,16 @@
 > 코드를 생성하기 전에 반드시 이 파일 전체를 숙지해.
 > 세부 계획은 CAPSTONE_PLAN.md, ERD는 docs/ERD.md, API 명세는 docs/API.md 참조.
 
+## 0. 작업 원칙 — 수정 전 반드시 확인
+
+코드를 수정하기 전에 아래 질문을 스스로 먼저 해.
+
+1. **실질적으로 필요한가?** 일관성·규칙 준수 목적만이라면 신중히 판단. 동작에 실질적 이득이 없으면 수정하지 않는 게 나을 수 있다.
+2. **가독성이 나빠지지 않는가?** 중복 제거·추상화가 오히려 의도를 불명확하게 만들면 하지 않는다.
+3. **수정 범위가 명확한가?** 영향받는 파일과 호출부를 먼저 파악하고, 사용자에게 결과를 먼저 설명한 뒤 허락을 받아 수정한다.
+
+> 무조건 "Best Practice"를 적용하지 말 것. 현재 코드가 충분히 명확하고 파악할 수 있고 동작에 문제없다면 그대로 두는 것도 올바른 판단이다.
+
 ---
 
 ## 1. 프로젝트 개요
@@ -65,7 +75,9 @@ com.capstone.gitmanager
 ```
 
 ### Entity 작성 규칙
-- 모든 Entity는 `BaseEntity` 상속 (createdAt, updatedAt 자동 관리)
+- 도메인 Entity는 `BaseEntity` 상속 (createdAt, updatedAt 자동 관리)
+  - 예외: 생성 후 수정이 없는 불변 토큰 엔티티 (RefreshToken, EmailVerificationToken 등)는 `createdAt`만 수동 선언
+- 구조 상 'BaseEntity'가 필요없다면 상속하지 않는다
 - `@NoArgsConstructor(access = PROTECTED)` 필수
 - 연관관계 편의 메서드는 Entity 안에 작성
 - Lombok 사용: `@Getter`만. `@Setter` 절대 금지
@@ -248,7 +260,7 @@ JPA @SQLRestriction("is_deleted = false") 자동 필터링
 
 ```sql
 -- 회원 (created_at, updated_at은 BaseEntity가 자동 관리)
-users: id, email, password, name, email_verified
+users: id, login_id UNIQUE, email UNIQUE, password, name, email_verified
 
 -- 이메일 인증 토큰 (회원가입 시 발급, 인증 완료 후 삭제)
 email_verification_tokens: id, user_id, token, expires_at, created_at
@@ -294,9 +306,9 @@ todos: id, user_id, content, is_done, created_at
 > 작업 완료 시 이 섹션을 직접 업데이트해.
 
 - [x] 프로젝트 세팅 (Spring Boot 3.5.12, MySQL 연결)
-- [ ] BaseEntity, ApiResponse, GlobalExceptionHandler 공통 클래스
-- [ ] CORS 설정 (WebMvcConfigurer)
-- [ ] 기능 1: 회원 관리 + JWT (1차: RT 저장/만료 검증)
+- [x] BaseEntity, ApiResponse, GlobalExceptionHandler 공통 클래스
+- [x] CORS 설정 (WebMvcConfigurer)
+- [x] 기능 1: 회원 관리 + JWT (1차: RT 저장/만료 검증)
 - [ ] 기능 2: 팀 프로젝트 관리 (초대 코드 방식)
 - [ ] 기능 3: 개인 ToDo
 - [ ] 기능 4: Develop Board
@@ -306,5 +318,7 @@ todos: id, user_id, content, is_done, created_at
 - [ ] 기능 7: 대시보드
 - [ ] Docker 빌드
 - [ ] AWS 배포
+  - [ ] 배포 전 체크: RefreshToken 쿠키에 `setSecure(true)`, `setSameSite("Strict")` 추가 (AuthService.java - setRefreshTokenCookie)
+  - [ ] 배포 전 체크: `application.yaml` `show-sql: true` → `false` 로 변경 (또는 배포용 프로파일에서 override)
 
 ---
