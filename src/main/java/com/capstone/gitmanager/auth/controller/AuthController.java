@@ -1,5 +1,6 @@
 package com.capstone.gitmanager.auth.controller;
 
+import com.capstone.gitmanager.auth.dto.EmailVerifyRequest;
 import com.capstone.gitmanager.auth.dto.LoginRequest;
 import com.capstone.gitmanager.auth.dto.LoginResponse;
 import com.capstone.gitmanager.auth.dto.RegisterRequest;
@@ -25,9 +26,9 @@ public class AuthController {
         return ApiResponse.ok();
     }
 
-    @GetMapping("/verify-email")
-    public ApiResponse<Void> verifyEmail(@RequestParam String token) {
-        authService.verifyEmail(token);
+    @PostMapping("/verify-email")
+    public ApiResponse<Void> verifyEmail(@Valid @RequestBody EmailVerifyRequest request) {
+        authService.verifyEmail(request);
         return ApiResponse.ok();
     }
 

@@ -1,5 +1,6 @@
 package com.capstone.gitmanager.auth.service;
 
+import com.capstone.gitmanager.auth.dto.EmailVerifyRequest;
 import com.capstone.gitmanager.auth.dto.LoginRequest;
 import com.capstone.gitmanager.auth.dto.LoginResponse;
 import com.capstone.gitmanager.auth.dto.RegisterRequest;
@@ -26,9 +27,9 @@ import org.springframework.web.util.WebUtils;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.Base64;
-import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -60,20 +61,21 @@ public class AuthService {
                 .build();
         userRepository.save(user);
 
-        String token = UUID.randomUUID().toString();
+        String code = String.format("%06d", new SecureRandom().nextInt(1_000_000));
         EmailVerificationToken emailToken = EmailVerificationToken.builder()
                 .user(user)
-                .token(token)
+                .token(code)
                 .expiresAt(LocalDateTime.now().plusMinutes(30))
                 .build();
         emailTokenRepository.save(emailToken);
 
-        emailService.sendVerificationEmail(user.getEmail(), token);
+        emailService.sendVerificationEmail(user.getEmail(), code);
     }
 
     @Transactional
-    public void verifyEmail(String token) {
-        EmailVerificationToken emailToken = emailTokenRepository.findByToken(token)
+    public void verifyEmail(EmailVerifyRequest request) {
+        EmailVerificationToken emailToken = emailTokenRepository
+                .findByUser_EmailAndToken(request.email(), request.code())
                 .orElseThrow(() -> new CustomException(ErrorCode.INVALID_EMAIL_TOKEN));
 
         if (emailToken.isExpired()) {
@@ -98,6 +100,8 @@ public class AuthService {
 
         String accessToken = jwtUtil.generateAccessToken(user.getId());
         String refreshToken = jwtUtil.generateRefreshToken(user.getId());
+
+        refreshTokenRepository.deleteByUser(user);
 
         RefreshToken refreshTokenEntity = RefreshToken.builder()
                 .user(user)

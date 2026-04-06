@@ -32,7 +32,8 @@ public enum ErrorCode {
     PROJECT_MEMBER_NOT_FOUND(HttpStatus.NOT_FOUND, "PROJECT_MEMBER_NOT_FOUND", "프로젝트 멤버를 찾을 수 없습니다."),
     ALREADY_PROJECT_MEMBER(HttpStatus.CONFLICT, "ALREADY_PROJECT_MEMBER", "이미 프로젝트 멤버입니다."),
     INVALID_INVITE_CODE(HttpStatus.BAD_REQUEST, "INVALID_INVITE_CODE", "유효하지 않은 초대 코드입니다."),
-    OWNER_CANNOT_LEAVE(HttpStatus.BAD_REQUEST, "OWNER_CANNOT_LEAVE", "프로젝트 OWNER는 탈퇴할 수 없습니다."),
+    OWNER_CANNOT_LEAVE(HttpStatus.BAD_REQUEST, "OWNER_CANNOT_LEAVE", "OWNER는 멤버가 있을 경우 새 OWNER를 지정해야 합니다."),
+    NEW_OWNER_REQUIRED(HttpStatus.BAD_REQUEST, "NEW_OWNER_REQUIRED", "탈퇴 전 새 OWNER를 지정해야 합니다."),
 
     // Card
     CARD_NOT_FOUND(HttpStatus.NOT_FOUND, "CARD_NOT_FOUND", "카드를 찾을 수 없습니다."),

@@ -1,5 +1,6 @@
-package com.capstone.gitmanager.auth.entity;
+package com.capstone.gitmanager.todo.entity;
 
+import com.capstone.gitmanager.auth.entity.User;
 import jakarta.persistence.*;
 import lombok.Builder;
 import lombok.Getter;
@@ -10,10 +11,10 @@ import java.time.LocalDateTime;
 import static lombok.AccessLevel.PROTECTED;
 
 @Entity
-@Table(name = "email_verification_tokens")
+@Table(name = "todos")
 @Getter
 @NoArgsConstructor(access = PROTECTED)
-public class EmailVerificationToken {
+public class Todo {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -24,22 +25,22 @@ public class EmailVerificationToken {
     private User user;
 
     @Column(nullable = false)
-    private String token;
+    private String content;
 
     @Column(nullable = false)
-    private LocalDateTime expiresAt;
+    private boolean isDone = false;
 
-    @Column(nullable = false, updatable = false)
-    private LocalDateTime createdAt = LocalDateTime.now();
+    @Column(nullable = false)
+    private LocalDateTime createdAt;
 
     @Builder
-    private EmailVerificationToken(User user, String token, LocalDateTime expiresAt) {
+    private Todo(User user, String content) {
         this.user = user;
-        this.token = token;
-        this.expiresAt = expiresAt;
+        this.content = content;
+        this.createdAt = LocalDateTime.now();
     }
 
-    public boolean isExpired() {
-        return LocalDateTime.now().isAfter(expiresAt);
+    public void toggleDone() {
+        this.isDone = !this.isDone;
     }
 }
