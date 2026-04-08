@@ -370,7 +370,7 @@ todos: id, user_id, content, is_done, created_at
 - [x] BaseEntity, ApiResponse, GlobalExceptionHandler 공통 클래스
 - [x] CORS 설정 (WebMvcConfigurer)
 - [x] 기능 1: 회원 관리 + JWT (1차: RT 저장/만료 검증)
-- [x] 기능 2: 팀 프로젝트 관리 (초대 코드 방식)
+  - [x] 기능 2: 팀 프로젝트 관리 (초대 코드 방식)
 - [x] 기능 3: 개인 ToDo
 - [ ] 기능 4: Develop Board
 - [ ] 기능 5: GitHub Webhook 연동
