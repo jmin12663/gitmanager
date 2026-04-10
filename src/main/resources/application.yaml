@@ -1,8 +1,6 @@
 spring:
   application:
     name: gitmanager
-  profiles:
-    include: local
   datasource:
     url: jdbc:mysql://localhost:3306/gitmanager?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
     username: ${DB_USERNAME}

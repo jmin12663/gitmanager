@@ -301,64 +301,64 @@ todos: id, user_id, content, is_done, created_at
 
 ---
 
-## 6. 4월 14일 시연 준비 — "시연 준비 시작" 이라고 하면 아래 순서대로 구현 시작
+## 6. 시연 계획 (2026-04-14, 1차 발표)
 
-> 시연 목표: 다른 컴퓨터에서 회원가입 → 이메일 인증 → 로그인 → AWS RDS에 BCrypt 암호화된 비밀번호 저장 확인
+### 시연 목표
+클라우드(AWS EC2 + RDS) 환경에서 회원가입·로그인 동작을 시연하고,
+비밀번호가 암호화(BCrypt)된 상태로 클라우드 DB에 저장됨을 증명.
+로컬로 프로젝트 실행하는게 아님
 
-### 준비 상태
-- [ ] Step 1: AWS RDS 연결
-- [ ] Step 2: 서버 외부 노출 (ngrok)
-- [ ] Step 3: 이메일 인증 흐름 테스트
-- [ ] Step 4: 전체 시연 흐름 최종 검증
+### 배포 아키텍처
+```
+Postman / 브라우저
+    ↓  HTTP :8080
+AWS EC2 (Ubuntu 22.04, Java 21)
+  └── Spring Boot JAR  (spring.profiles.active=prod)
+    ↓  JDBC :3306
+AWS RDS (MySQL 8.0)  ←  DB명: gitmanager
+```
 
-### Step 1 — AWS RDS 연결
-**작업 내용:**
-1. `application.yaml` datasource URL을 RDS 엔드포인트로 변경
-   - `jdbc:mysql://{RDS_ENDPOINT}:3306/gitmanager?serverTimezone=Asia/Seoul&characterEncoding=UTF-8`
-   - URL은 환경변수 `DB_URL`로 분리 권장
-2. `application-local.yaml`에서 DB username/password를 RDS 계정으로 변경
-3. RDS 보안 그룹에서 로컬 IP 인바운드 3306 허용 확인
-4. 서버 실행 후 `ddl-auto: update`로 테이블 자동 생성 확인
+### 배포 전 준비 체크리스트
+- [ ] `./gradlew clean build -x test` 빌드 성공 확인
+- [ ] AWS RDS 생성 (MySQL 8.0, db.t3.micro)
+  - DB 이름: `gitmanager`
+  - 보안그룹: EC2 → RDS 3306 인바운드 허용
+- [ ] AWS EC2 생성 (Ubuntu 22.04, t2.micro)
+  - 보안그룹 인바운드: 22(SSH), 8080(앱) 오픈
+- [ ] EC2에 Java 21 설치: `sudo apt install -y openjdk-21-jre-headless`
+- [ ] JAR 업로드: `scp -i key.pem build/libs/*.jar ubuntu@<EC2_IP>:/home/ubuntu/app.jar`
+- [ ] EC2 환경변수 설정 후 앱 기동 (아래 참조)
 
-**확인 방법:** 서버 기동 로그에 Hibernate DDL 실행 확인 + AWS RDS 콘솔 쿼리 편집기에서 `SHOW TABLES;`
+### EC2 기동 명령어
+```bash
+export DB_HOST=<RDS_ENDPOINT>
+export DB_USERNAME=<RDS_USERNAME>
+export DB_PASSWORD=<RDS_PASSWORD>
+export JWT_SECRET=<JWT_SECRET>
+export AES_SECRET_KEY=<AES_SECRET_KEY>
+export MAIL_USERNAME=<GMAIL_ADDRESS>
+export MAIL_PASSWORD=<GMAIL_APP_PASSWORD>
 
-### Step 2 — EC2 배포 (추후 본 배포에도 그대로 재활용)
-**작업 내용:**
-1. EC2 인스턴스 생성 (Amazon Linux 2 / t2.micro)
-2. 보안 그룹 인바운드 규칙: 8080(서버), 22(SSH) 허용
-3. 탄력적 IP 할당 → 고정 IP로 시연 (세션 끊겨도 URL 유지)
-4. EC2에 Java 설치 후 jar 배포
-   - `./gradlew bootJar` → `build/libs/*.jar` 생성
-   - `scp`로 EC2에 전송 후 실행
-5. 환경변수(`DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, `JWT_SECRET`, `AES_SECRET_KEY`, `MAIL_USERNAME`, `MAIL_PASSWORD`) EC2에 설정
-6. RDS 보안 그룹에서 EC2의 프라이빗 IP 인바운드 3306 허용
+nohup java -Dspring.profiles.active=prod -jar app.jar > app.log 2>&1 &
+tail -f app.log   # 기동 로그 확인
+```
 
-**시연 URL 형태:** `http://{EC2_탄력적IP}:8080/api/auth/register`
+### 시연 순서
+| # | 행동 | 확인 포인트 |
+|---|------|-------------|
+| 1 | `POST http://<EC2_IP>:8080/api/auth/register` 호출 | `{"success": true}` 응답 + 이메일 인증 메일 수신 |
+| 2 | 이메일 인증 링크 클릭 (또는 토큰 직접 입력) | 인증 완료 응답 확인 |
+| 3 | `POST http://<EC2_IP>:8080/api/auth/login` 호출 | `accessToken`, `refreshToken` 발급 확인 |
+| 4 | MySQL Workbench로 RDS 접속 후 쿼리 실행 | `password` 컬럼이 `$2a$10$...` 형태(BCrypt) 확인 |
 
-### Step 3 — 이메일 인증 흐름 테스트
-**현재 구조:** 회원가입 후 이메일 인증 필수 (`isEmailVerified()` 체크) → 미인증 상태로 로그인 시 `EMAIL_NOT_VERIFIED` 에러 발생
-
-**테스트 시나리오:**
-1. `POST /api/auth/register` → 이메일 수신 확인
-2. `GET /api/auth/verify-email?token=...` → 인증 완료
-3. `POST /api/auth/login` → 성공 확인
-4. RDS에서 `SELECT login_id, password FROM users;` → `$2a$...` BCrypt 형태 확인
-
-### Step 3.5 — 시연용 HTML 폼 제작
-**작업 내용:**
-- 단일 HTML 파일 (`demo.html`) 작성 — 별도 서버 불필요, 브라우저에서 바로 열기
-- 회원가입 폼: loginId, email, password, name 입력 → `POST /api/auth/register`
-- 이메일 인증 안내 문구 표시 (인증 후 로그인 가능 안내)
-- 로그인 폼: identifier(아이디 or 이메일), password 입력 → `POST /api/auth/login`
-- 로그인 성공 시 사용자 이름 표시
-- EC2 URL을 fetch 대상으로 설정 (`http://{EC2_탄력적IP}:8080`)
-- CORS 허용 Origin에 `null` 또는 로컬 파일 origin 추가 필요
-
-### Step 4 — 최종 검증 체크리스트
-- [ ] 다른 컴퓨터에서 `demo.html` 열어 회원가입 요청 성공
-- [ ] 이메일 인증 메일 수신 및 인증 완료
-- [ ] 로그인 후 사용자 이름 화면에 표시 확인
-- [ ] AWS RDS 콘솔에서 암호화된 비밀번호(`$2a$...`) 직접 확인
+### RDS 암호화 확인 쿼리
+```sql
+SELECT login_id, email, password, email_verified
+FROM users
+ORDER BY created_at DESC
+LIMIT 5;
+```
+→ `password` 값이 `$2a$10$` 로 시작하면 BCrypt 암호화 저장 증명 완료.
 
 ---
 
@@ -370,7 +370,8 @@ todos: id, user_id, content, is_done, created_at
 - [x] BaseEntity, ApiResponse, GlobalExceptionHandler 공통 클래스
 - [x] CORS 설정 (WebMvcConfigurer)
 - [x] 기능 1: 회원 관리 + JWT (1차: RT 저장/만료 검증)
-  - [x] 기능 2: 팀 프로젝트 관리 (초대 코드 방식)
+  - [x] UX 개선: 로그인 시 이메일 미인증 계정 → `verify.html`로 자동 리다이렉트 (loginId 입력 시에도 실제 이메일 자동 전달)
+- [x] 기능 2: 팀 프로젝트 관리 (초대 코드 방식)
 - [x] 기능 3: 개인 ToDo
 - [ ] 기능 4: Develop Board
 - [ ] 기능 5: GitHub Webhook 연동
@@ -381,5 +382,15 @@ todos: id, user_id, content, is_done, created_at
 - [ ] AWS 배포
   - [ ] 배포 전 체크: RefreshToken 쿠키에 `setSecure(true)`, `setSameSite("Strict")` 추가 (AuthService.java - setRefreshTokenCookie)
   - [ ] 배포 전 체크: `application.yaml` `show-sql: true` → `false` 로 변경 (또는 배포용 프로파일에서 override)
+
+**프론트엔드 (백엔드 완성 후 React로 개발)**
+- [ ] 프론트 프로젝트 세팅 (Vite + React)
+- [ ] 기능 1: 회원가입 / 로그인 / 이메일 인증 페이지
+- [ ] 기능 2: 사이드바 + 팀 프로젝트 관리 페이지
+- [ ] 기능 3: 개인 ToDo 페이지
+- [ ] 기능 4: Develop Board (칸반)
+- [ ] 기능 6: 캘린더 페이지
+- [ ] 기능 7: 대시보드 페이지
+- [ ] 프론트 배포 (React 빌드 결과물 → Spring Boot static 폴더 → EC2 단일 배포)
 
 ---

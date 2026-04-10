@@ -4,6 +4,58 @@
 
 ---
 
+# 설정 파일 & 배포
+
+## src/main/resources/application.yaml
+**역할**: 공통 설정 파일. 데이터소스, JPA, Mail, JWT, Jasypt, CORS, 서버 포트를 정의. 민감값은 환경변수로 주입.
+**주요 설정**: `datasource.url`(localhost MySQL 기본), `show-sql: true`(로컬 개발용), `server.port: 8080`
+**플로우**: 앱 시작 → `application.yaml` 로드 → 활성 프로파일(`-Dspring.profiles.active=prod`)에 따라 `application-prod.yaml`로 오버라이드
+**특이사항**: 프로파일 지정 없으면 localhost MySQL 기준으로 동작
+
+---
+
+## src/main/resources/application-prod.yaml
+**역할**: EC2 배포 환경 전용 설정. `application.yaml`의 로컬 설정을 오버라이드한다.
+**주요 설정**: `DB_HOST` 환경변수로 RDS 엔드포인트 주입, `show-sql: false`, Mail/JWT/Jasypt 환경변수 주입
+**플로우**: `-Dspring.profiles.active=prod` 실행 → `application-prod.yaml` 오버라이드 적용 → EC2에서 RDS 연결
+**특이사항**: `.gitignore`에 등록되어 있음 — 비밀값이 포함되므로 절대 커밋 금지. EC2 배포 시 직접 파일 업로드
+
+---
+
+## Dockerfile
+**역할**: Spring Boot JAR를 실행하는 Docker 이미지 빌드 파일.
+**주요 설정**: `eclipse-temurin:21-jre-jammy` 베이스 이미지, `build/libs/*.jar`를 `app.jar`로 복사, `spring.profiles.active=prod`로 실행
+**플로우**: `./gradlew build` → JAR 생성 → `docker build` → 이미지 빌드 → EC2에서 실행
+**특이사항**: 현재 JAR 직접 배포 방식을 사용 중이므로 선택적 사용. Docker 미사용 시 `java -Dspring.profiles.active=prod -jar app.jar`로 직접 실행
+
+---
+
+# 시연용 Static HTML (4월 14일 1차 시연 전용)
+
+## src/main/resources/static/register.html
+**역할**: 회원가입 시연용 HTML 페이지. 디자인 없이 입력 폼만 구성.
+**주요 동작**: name/loginId/email/password 입력 → `POST /api/auth/register` 호출 → 성공 시 `verify.html?email=...`로 자동 이동
+**플로우**: 브라우저 → `http://<EC2_IP>:8080/register.html` → `/api/auth/register` API 호출 → `verify.html` 이동
+**특이사항**: React 프론트 개발 완료 후 삭제 예정. API 호출 시 상대 경로 사용으로 EC2 배포 후 별도 설정 불필요
+
+---
+
+## src/main/resources/static/verify.html
+**역할**: 이메일 인증 코드 입력 시연용 HTML 페이지.
+**주요 동작**: email/code 입력 → `POST /api/auth/verify-email` 호출 → 성공 시 `login.html`로 자동 이동. URL 파라미터로 이메일 자동 채움.
+**플로우**: `register.html` 성공 → `verify.html?email=...` → `/api/auth/verify-email` 호출 → `login.html` 이동
+**특이사항**: React 프론트 개발 완료 후 삭제 예정
+
+---
+
+## src/main/resources/static/login.html
+**역할**: 로그인 시연용 HTML 페이지. 로그인 성공 시 서버 응답(accessToken 포함)을 화면에 출력.
+**주요 동작**: identifier(아이디 or 이메일)/password 입력 → `POST /api/auth/login` 호출 → 성공 시 `data`(userId, name, email, accessToken)를 `<pre>`로 출력
+**플로우**: `verify.html` 성공 → `login.html` → `/api/auth/login` 호출 → 응답 JSON 화면 표시
+**특이사항**: 이메일 미인증(`EMAIL_NOT_VERIFIED`) 에러 시 응답의 `data.email`로 `verify.html?email=...`에 자동 이동. loginId로 로그인해도 서버가 실제 이메일을 반환하므로 인증 페이지에서 이메일 자동 입력됨. React 프론트 개발 완료 후 삭제 예정
+
+---
+
 # 앱 진입점
 
 ## GitmanagerApplication.java
@@ -40,12 +92,13 @@
 **역할**: Spring Security 필터 체인 설정. REST API 전용으로 CSRF 비활성화, 세션리스 구성.
 **주요 동작**:
 - CSRF 비활성화, 세션 정책 STATELESS
-- `permitAll` 경로: `/api/auth/**`, `/api/webhook/**`
+- `permitAll` 경로: `/api/auth/register`, `/api/auth/verify-email`, `/api/auth/login`, `/api/auth/refresh`, `/api/webhook/**`, `/*.html`, `/`, `/static/**`
 - 나머지 요청은 인증 필요
 - `JwtAuthenticationFilter`를 `UsernamePasswordAuthenticationFilter` 앞에 등록
 - `BCryptPasswordEncoder` 빈 등록
 **의존성**: `JwtUtil`, `JwtAuthenticationFilter`
 **플로우**: 모든 HTTP 요청 → `JwtAuthenticationFilter`(Bearer 파싱) → `SecurityFilterChain`(permitAll 분기) → 컨트롤러
+**특이사항**: `/*.html` 및 `/static/**` 경로를 permitAll에 추가 — Spring Security 6은 static 리소스도 인증 필터를 통과하므로 시연용 HTML 접근을 위해 명시적으로 허용 필요
 
 ---
 
@@ -87,6 +140,7 @@
 - `ok(T data)` — 성공 응답 (`success: true`, data 포함)
 - `ok()` — 데이터 없는 성공 응답
 - `fail(ErrorCode)` — 실패 응답 (`success: false`, error 포함)
+- `fail(ErrorCode, T data)` — 실패이지만 data도 함께 반환 (예: 이메일 미인증 시 이메일 주소 포함)
 **플로우**: 컨트롤러 → `ApiResponse.ok()` 또는 `GlobalExceptionHandler` → `ApiResponse.fail()` → HTTP 응답 바디
 
 ---
@@ -222,7 +276,8 @@
 - `login(LoginRequest, response)` — `resolveUser(identifier)` → 이메일 인증 여부·비밀번호 검증 → AT/RT 발급 → RT를 httpOnly 쿠키에 저장
 - `refresh(request)` — 쿠키에서 RT 추출 → 해시로 DB 조회 → 새 AT 발급
 - `logout(request, response)` — RT DB 삭제 → 쿠키 만료 처리
-- `resolveUser(identifier)` — `@` 포함 시 이메일로 조회, 미포함 시 username으로 조회
+- `findEmailByIdentifier(identifier)` — loginId 또는 이메일로 실제 이메일 주소 반환 (이메일 미인증 리다이렉트용)
+- `resolveUser(identifier)` — `@` 포함 시 이메일로 조회, 미포함 시 loginId로 조회
 **의존성**: `UserRepository`, `EmailVerificationTokenRepository`, `RefreshTokenRepository`, `JwtUtil`, `JwtProperties`, `EmailService`, `PasswordEncoder`
 **특이사항**: RT는 SHA-256 해시로 저장. 쿠키 path는 `/api/auth`로 제한해 불필요한 전송 방지
 
@@ -238,6 +293,7 @@
 - `POST /api/auth/logout` — 로그아웃
 **의존성**: `AuthService`
 **플로우**: HTTP 요청 → `JwtAuthenticationFilter` → `AuthController` → `AuthService` → `ApiResponse` 반환
+**특이사항**: `/login`은 `EMAIL_NOT_VERIFIED` 예외를 컨트롤러에서 직접 처리. `AuthService.findEmailByIdentifier()`로 실제 이메일을 조회해 `data.email`에 포함해 응답 — loginId로 로그인해도 인증 페이지에 올바른 이메일이 전달됨
 
 ---
 

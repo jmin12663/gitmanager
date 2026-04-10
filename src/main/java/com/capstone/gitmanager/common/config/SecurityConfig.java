@@ -35,7 +35,10 @@ public class SecurityConfig {
                                 "/api/auth/verify-email",// 이메일 인증
                                 "/api/auth/login",       // 로그인
                                 "/api/auth/refresh",     // 토큰 재발급
-                                "/api/webhook/**"        // GitHub Webhook (JWT 대신 GitHub Secret으로 검증)
+                                "/api/webhook/**",       // GitHub Webhook (JWT 대신 GitHub Secret으로 검증)
+                                "/*.html",               // 시연용 static HTML
+                                "/",                     // 루트
+                                "/static/**"             // static 리소스
                         ).permitAll()
                         // 그 외 모든 요청은 로그인(토큰) 필요
                         .anyRequest().authenticated()

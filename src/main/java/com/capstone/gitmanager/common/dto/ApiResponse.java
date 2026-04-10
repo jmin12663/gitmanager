@@ -15,4 +15,8 @@ public record ApiResponse<T>(boolean success, T data, ErrorResponse error) {
     public static ApiResponse<?> fail(ErrorCode code) {
         return new ApiResponse<>(false, null, new ErrorResponse(code.getCode(), code.getMessage()));
     }
+
+    public static <T> ApiResponse<T> fail(ErrorCode code, T data) {
+        return new ApiResponse<>(false, data, new ErrorResponse(code.getCode(), code.getMessage()));
+    }
 }

@@ -36,6 +36,8 @@ import java.util.Base64;
 @Transactional(readOnly = true)
 public class AuthService {
 
+    private static final int EMAIL_VERIFICATION_EXPIRE_MINUTES = 30;
+
     private final UserRepository userRepository;
     private final EmailVerificationTokenRepository emailTokenRepository;
     private final RefreshTokenRepository refreshTokenRepository;
@@ -65,7 +67,7 @@ public class AuthService {
         EmailVerificationToken emailToken = EmailVerificationToken.builder()
                 .user(user)
                 .token(code)
-                .expiresAt(LocalDateTime.now().plusMinutes(30))
+                .expiresAt(LocalDateTime.now().plusMinutes(EMAIL_VERIFICATION_EXPIRE_MINUTES))
                 .build();
         emailTokenRepository.save(emailToken);
 
@@ -146,6 +148,10 @@ public class AuthService {
         clearRefreshTokenCookie(response);
     }
     //로그인 시 이메일 혹은 아이디로 
+    public String findEmailByIdentifier(String identifier) {
+        return resolveUser(identifier).getEmail();
+    }
+
     private User resolveUser(String identifier) {
         if (identifier.contains("@")) {
             return userRepository.findByEmail(identifier)

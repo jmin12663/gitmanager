@@ -7,11 +7,15 @@ import com.capstone.gitmanager.auth.dto.RegisterRequest;
 import com.capstone.gitmanager.auth.dto.TokenRefreshResponse;
 import com.capstone.gitmanager.auth.service.AuthService;
 import com.capstone.gitmanager.common.dto.ApiResponse;
+import com.capstone.gitmanager.common.exception.CustomException;
+import com.capstone.gitmanager.common.exception.ErrorCode;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -33,9 +37,17 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public ApiResponse<LoginResponse> login(@Valid @RequestBody LoginRequest request,
-                                            HttpServletResponse response) {
-        return ApiResponse.ok(authService.login(request, response));
+    public ApiResponse<?> login(@Valid @RequestBody LoginRequest request,
+                                HttpServletResponse response) {
+        try {
+            return ApiResponse.ok(authService.login(request, response));
+        } catch (CustomException e) {
+            if (e.getErrorCode() == ErrorCode.EMAIL_NOT_VERIFIED) {
+                String email = authService.findEmailByIdentifier(request.identifier());
+                return ApiResponse.fail(ErrorCode.EMAIL_NOT_VERIFIED, Map.of("email", email));
+            }
+            throw e;
+        }
     }
 
     @PostMapping("/refresh")
