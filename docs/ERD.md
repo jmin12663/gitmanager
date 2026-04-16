@@ -81,6 +81,7 @@ CREATE TABLE user_project (
     user_id    BIGINT      NOT NULL,
     project_id BIGINT      NOT NULL,
     role       VARCHAR(10) NOT NULL,
+    joined_at  DATETIME(6) NOT NULL,
     PRIMARY KEY (user_id, project_id),
     FOREIGN KEY (user_id)    REFERENCES users    (id) ON DELETE CASCADE,
     FOREIGN KEY (project_id) REFERENCES projects (id) ON DELETE CASCADE
@@ -101,27 +102,33 @@ CREATE TABLE project_github (
 );
 
 -- Board 카드
--- status: TODO / IN_PROGRESS / DONE
+-- status: BACKLOG / IN_PROGRESS / DONE
 -- is_deleted: Soft Delete (JPA @SQLRestriction 으로 자동 필터링)
 -- merged_at: main merge 시 기록
 CREATE TABLE cards (
-    id          BIGINT        NOT NULL AUTO_INCREMENT,
-    project_id  BIGINT        NOT NULL,
-    title       VARCHAR(255)  NOT NULL,
-    status      VARCHAR(20)   NOT NULL DEFAULT 'TODO',
-    assignee_id BIGINT,
-    due_date    DATE,
-    memo        VARCHAR(1000),
-    image_url   VARCHAR(500),
-    is_deleted  BOOLEAN       NOT NULL DEFAULT FALSE,
-    created_by  BIGINT        NOT NULL,
-    merged_at   DATETIME(6),
-    created_at  DATETIME(6)   NOT NULL,
-    updated_at  DATETIME(6)   NOT NULL,
+    id         BIGINT        NOT NULL AUTO_INCREMENT,
+    project_id BIGINT        NOT NULL,
+    title      VARCHAR(255)  NOT NULL,
+    status     VARCHAR(20)   NOT NULL DEFAULT 'BACKLOG',
+    due_date   DATE,
+    memo       VARCHAR(1000),
+    is_deleted BOOLEAN       NOT NULL DEFAULT FALSE,
+    created_by BIGINT        NOT NULL,
+    merged_at  DATETIME(6),
+    created_at DATETIME(6)   NOT NULL,
+    updated_at DATETIME(6)   NOT NULL,
     PRIMARY KEY (id),
-    FOREIGN KEY (project_id)  REFERENCES projects (id) ON DELETE CASCADE,
-    FOREIGN KEY (assignee_id) REFERENCES users    (id) ON DELETE SET NULL,
-    FOREIGN KEY (created_by)  REFERENCES users    (id)
+    FOREIGN KEY (project_id) REFERENCES projects (id) ON DELETE CASCADE,
+    FOREIGN KEY (created_by) REFERENCES users    (id)
+);
+
+-- 카드 담당자 (다대다, 복합 PK)
+CREATE TABLE card_assignees (
+    card_id BIGINT NOT NULL,
+    user_id BIGINT NOT NULL,
+    PRIMARY KEY (card_id, user_id),
+    FOREIGN KEY (card_id) REFERENCES cards (id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
 );
 
 -- 카드-branch 연결 (1카드 : N브랜치, 복합 PK)
@@ -155,12 +162,13 @@ CREATE TABLE comments (
     content    VARCHAR(1000) NOT NULL,
     is_deleted BOOLEAN       NOT NULL DEFAULT FALSE,
     created_at DATETIME(6)   NOT NULL,
+    updated_at DATETIME(6)   NOT NULL,
     PRIMARY KEY (id),
     FOREIGN KEY (card_id) REFERENCES cards (id) ON DELETE CASCADE,
     FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
 );
 
--- 일정 (card_id nullable → 카드 마감일 자동 연동 또는 독립 일정)
+-- 일정
 CREATE TABLE schedules (
     id         BIGINT       NOT NULL AUTO_INCREMENT,
     project_id BIGINT       NOT NULL,
@@ -168,13 +176,11 @@ CREATE TABLE schedules (
     start_date DATE         NOT NULL,
     end_date   DATE         NOT NULL,
     created_by BIGINT       NOT NULL,
-    card_id    BIGINT,
     created_at DATETIME(6)  NOT NULL,
     updated_at DATETIME(6)  NOT NULL,
     PRIMARY KEY (id),
     FOREIGN KEY (project_id) REFERENCES projects (id) ON DELETE CASCADE,
-    FOREIGN KEY (created_by) REFERENCES users    (id),
-    FOREIGN KEY (card_id)    REFERENCES cards    (id) ON DELETE SET NULL
+    FOREIGN KEY (created_by) REFERENCES users    (id)
 );
 
 -- 개인 ToDo (수정 기능 있으나 수정 시점 추적 불필요)
@@ -198,11 +204,11 @@ CREATE TABLE todos (
 | `card_branch` 복합 PK `(card_id, branch_name)` | 1카드에 N브랜치 허용, 동일 카드+브랜치 중복 등록 방지 |
 | `commit_logs.commit_sha` UNIQUE | Webhook 중복 수신 시 멱등성 보장 |
 | `cards.is_deleted`, `comments.is_deleted` | Soft Delete — commit_logs, comments 연쇄 삭제 방지 |
-| `comments` 에 `updated_at` 없음 | 댓글 수정 API 없음, 등록·삭제만 존재 |
+| `comments` 에 `updated_at` 있음 | BaseEntity 상속으로 JPA Auditing 자동 관리 (수정 API는 없지만 Auditing 일관성 유지) |
 | `todos` 에 `updated_at` 없음 | 개인 일정, 수정 시점 추적 불필요 |
 | `project_github` PK = project_id | 프로젝트당 GitHub repo 1개 고정 |
 | `project_github` 에 `created_at`, `updated_at` | PAT 암호화 데이터, 등록·수정 시점 감사 필요 |
 | `user_project.role` OWNER/MEMBER | 초대 코드 조회·재발급, 팀원 강퇴 권한 분리 |
-| `schedules.card_id` nullable | 카드 마감일 자동 연동 + 독립 일정 모두 수용 |
+| `card_assignees` 별도 테이블 | 카드-유저 다대다, 복합 PK (card_id, user_id) |
 | `refresh_tokens.is_used` | 1차 미사용, 8주차 RTR 적용 시 활성화 |
 | `pat_encrypted` Jasypt 암호화 | PAT 평문 저장 금지, 키는 환경변수 `AES_SECRET_KEY` |

@@ -5,6 +5,7 @@ import com.capstone.gitmanager.auth.dto.LoginRequest;
 import com.capstone.gitmanager.auth.dto.LoginResponse;
 import com.capstone.gitmanager.auth.dto.RegisterRequest;
 import com.capstone.gitmanager.auth.dto.TokenRefreshResponse;
+import com.capstone.gitmanager.auth.dto.UserResponse;
 import com.capstone.gitmanager.auth.entity.EmailVerificationToken;
 import com.capstone.gitmanager.auth.entity.RefreshToken;
 import com.capstone.gitmanager.auth.entity.User;
@@ -19,6 +20,7 @@ import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,6 +39,9 @@ import java.util.Base64;
 public class AuthService {
 
     private static final int EMAIL_VERIFICATION_EXPIRE_MINUTES = 30;
+
+    @Value("${cookie.secure:false}")
+    private boolean cookieSecure;
 
     private final UserRepository userRepository;
     private final EmailVerificationTokenRepository emailTokenRepository;
@@ -147,7 +152,13 @@ public class AuthService {
         }
         clearRefreshTokenCookie(response);
     }
-    //로그인 시 이메일 혹은 아이디로 
+    public UserResponse getMe(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+        return UserResponse.from(user);
+    }
+
+    //로그인 시 이메일 혹은 아이디로
     public String findEmailByIdentifier(String identifier) {
         return resolveUser(identifier).getEmail();
     }
@@ -164,6 +175,7 @@ public class AuthService {
     private void setRefreshTokenCookie(HttpServletResponse response, String token) {
         Cookie cookie = new Cookie("refreshToken", token);
         cookie.setHttpOnly(true);
+        cookie.setSecure(cookieSecure);
         cookie.setPath("/api/auth");
         cookie.setMaxAge((int) (jwtProperties.refreshExpiration() / 1000));
         response.addCookie(cookie);
@@ -172,6 +184,7 @@ public class AuthService {
     private void clearRefreshTokenCookie(HttpServletResponse response) {
         Cookie cookie = new Cookie("refreshToken", "");
         cookie.setHttpOnly(true);
+        cookie.setSecure(cookieSecure);
         cookie.setPath("/api/auth");
         cookie.setMaxAge(0);
         response.addCookie(cookie);

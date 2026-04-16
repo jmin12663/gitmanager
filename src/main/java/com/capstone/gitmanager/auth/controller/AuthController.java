@@ -5,6 +5,7 @@ import com.capstone.gitmanager.auth.dto.LoginRequest;
 import com.capstone.gitmanager.auth.dto.LoginResponse;
 import com.capstone.gitmanager.auth.dto.RegisterRequest;
 import com.capstone.gitmanager.auth.dto.TokenRefreshResponse;
+import com.capstone.gitmanager.auth.dto.UserResponse;
 import com.capstone.gitmanager.auth.service.AuthService;
 import com.capstone.gitmanager.common.dto.ApiResponse;
 import com.capstone.gitmanager.common.exception.CustomException;
@@ -13,6 +14,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
@@ -59,5 +61,10 @@ public class AuthController {
     public ApiResponse<Void> logout(HttpServletRequest request, HttpServletResponse response) {
         authService.logout(request, response);
         return ApiResponse.ok();
+    }
+
+    @GetMapping("/me")
+    public ApiResponse<UserResponse> getMe(@AuthenticationPrincipal Long userId) {
+        return ApiResponse.ok(authService.getMe(userId));
     }
 }

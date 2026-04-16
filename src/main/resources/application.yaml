@@ -37,5 +37,8 @@ jasypt:
 cors:
   allowed-origins: http://localhost:3000
 
+cookie:
+  secure: false
+
 server:
   port: 8080

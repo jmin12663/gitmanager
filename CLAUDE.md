@@ -2,7 +2,12 @@
 
 > 이 파일은 Claude Code가 매 작업마다 자동으로 읽는 컨텍스트야.
 > 코드를 생성하기 전에 반드시 이 파일 전체를 숙지해.
-> 세부 계획은 CAPSTONE_PLAN.md, ERD는 docs/ERD.md, API 명세는 docs/API.md 참조.
+> 세부 계획은 CAPSTONE_PLAN.md, ERD는 docs/ERD.md 참조.
+
+> **작업 시작 전 필수 파일 로드 규칙**
+> - 백엔드(Entity/Repository/Service/Controller) 작업 시: 코드 작성 전 반드시 `docs/ERD.md`
+> - 프론트엔드(React 컴포넌트/페이지/API 연동) 작업 시: 코드 작성 전 반드시 `docs/FRONTEND.md`
+> - 배포(Docker/EC2/환경변수) 작업 시: 반드시 `docs/DEPLOY.md` 를 읽을 것
 
 ## 0. 작업 원칙 — 수정 전 반드시 확인
 
@@ -197,8 +202,8 @@ commit_logs   : id, card_id, commit_sha UNIQUE, message, author, committed_at
 - 진입점 B (branch 먼저): GitHub branch 생성 Webhook 수신 → 미연결 카드 자동 생성
 
 **카드 상태 자동 전환 규칙**
-- branch 생성 Webhook → 미연결 카드 자동 생성 (status: TODO)
-- branch에 commit push → 연결된 카드 status: IN_PROGRESS 로 변경
+- branch 생성 Webhook → 미연결 카드 자동 생성 (status: IN_PROGRESS) — 브랜치 생성 자체가 개발 시작을 의미
+- branch에 commit push → 연결된 카드가 BACKLOG이면 IN_PROGRESS 로 변경 (진입점 A 대응)
 - main branch로 merge → 연결된 카드 status: DONE 으로 변경 + merge 시간 기록
 
 **Webhook 처리 로직**
@@ -206,7 +211,7 @@ commit_logs   : id, card_id, commit_sha UNIQUE, message, author, committed_at
 POST /api/webhook/github 수신
 → X-Hub-Signature-256 헤더로 GitHub Secret 검증 (검증 실패 시 403)
 → event 타입 분기
-   └── "create" (branch 생성): card_branch 조회 → 없으면 미연결 카드 생성
+   └── "create" (branch 생성): card_branch 조회 → 없으면 미연결 카드 생성 (status: IN_PROGRESS)
    └── "push"  (commit push) : branch_name으로 카드 조회 → IN_PROGRESS 전환 + commit_logs 저장
                                commit_sha UNIQUE 제약으로 중복 수신 방지
    └── "pull_request" (merge): merged=true 확인 → DONE 전환 + merge 시간 기록
@@ -220,21 +225,6 @@ POST /api/webhook/github 수신
   1차: 만료 여부만 검증
   2차 (8주차 이후): RTR 적용 — RT 사용 시 새 RT 발급 + 기존 RT 즉시 무효화
 → Refresh Token도 만료 시 → 재로그인
-```
-
-### 프로젝트 ↔ 유저 다대다
-```
-user_project: user_id, project_id, role (OWNER / MEMBER)
-→ 사이드바 조회: SELECT projects WHERE user_id = :userId
-→ OWNER만 프로젝트 삭제 / 팀원 강퇴 가능
-```
-
-### 팀원 초대 (초대 코드 방식)
-```
-프로젝트 생성 시 6자리 랜덤 초대 코드 자동 발급
-→ projects 테이블: invite_code UNIQUE 컬럼
-→ OWNER만 코드 조회/재발급 가능
-→ 팀원이 코드 입력 시 user_project에 MEMBER로 추가
 ```
 
 ### 이미지 업로드 (서버 중계 방식)
@@ -258,139 +248,66 @@ JPA @SQLRestriction("is_deleted = false") 자동 필터링
 
 ## 5. DB 핵심 테이블 구조
 
-```sql
--- 회원 (created_at, updated_at은 BaseEntity가 자동 관리)
-users: id, login_id UNIQUE, email UNIQUE, password, name, email_verified
+상세 스키마 → docs/ERD.md 참조
 
--- 이메일 인증 토큰 (회원가입 시 발급, 인증 완료 후 삭제)
-email_verification_tokens: id, user_id, token, expires_at, created_at
-
--- Refresh Token (1차: is_used 미사용, 8주차 RTR 적용 시 활성화)
-refresh_tokens: id, user_id, token_hash, is_used, expires_at, created_at
-
--- 프로젝트
-projects: id, name, description, start_date, end_date, created_by, invite_code UNIQUE
-
--- 유저-프로젝트 (다대다, 복합 PK)
-user_project: user_id, project_id, role (OWNER/MEMBER)
-  PRIMARY KEY (user_id, project_id)
-
--- GitHub 연동 (project_id가 PK이자 FK, PAT는 Jasypt 암호화, 키는 환경변수 AES_SECRET_KEY)
-project_github: project_id, repo_url, repo_name, pat_encrypted, webhook_secret
-  PRIMARY KEY (project_id)
-
--- Board 카드
-cards: id, project_id, title, status (TODO/IN_PROGRESS/DONE), assignee_id, due_date, memo, image_url, is_deleted, created_by, merged_at
-
--- 카드-branch 연결 (1:N, 복합 PK)
-card_branch: card_id, branch_name, repo_name, created_at
-  PRIMARY KEY (card_id, branch_name)
-
--- commit 이력 (commit_sha UNIQUE → 중복 수신 방지)
-commit_logs: id, card_id, commit_sha UNIQUE, message, author, committed_at
-
--- 댓글
-comments: id, card_id, user_id, content, created_at, is_deleted
-
--- 일정
-schedules: id, project_id, title, start_date, end_date, created_by, card_id(nullable)
-
--- ToDo
-todos: id, user_id, content, is_done, created_at
-```
+핵심 관계 요약:
+- `user_project`: 복합 PK (user_id, project_id), role = OWNER/MEMBER — OWNER만 프로젝트 삭제·강퇴·초대코드 재발급 가능
+- `card_branch`: 복합 PK (card_id, branch_name)
+- `card_assignees`: 복합 PK (card_id, user_id)
+- `commit_logs`: commit_sha UNIQUE → 중복 Webhook 방지
+- `project_github`: project_id가 PK이자 FK, PAT는 Jasypt 암호화 (AES_SECRET_KEY)
 
 ---
 
-## 6. 시연 계획 (2026-04-14, 1차 발표)
-
-### 시연 목표
-클라우드(AWS EC2 + RDS) 환경에서 회원가입·로그인 동작을 시연하고,
-비밀번호가 암호화(BCrypt)된 상태로 클라우드 DB에 저장됨을 증명.
-로컬로 프로젝트 실행하는게 아님
-
-### 배포 아키텍처
-```
-Postman / 브라우저
-    ↓  HTTP :8080
-AWS EC2 (Ubuntu 22.04, Java 21)
-  └── Spring Boot JAR  (spring.profiles.active=prod)
-    ↓  JDBC :3306
-AWS RDS (MySQL 8.0)  ←  DB명: gitmanager
-```
-
-### 배포 전 준비 체크리스트
-- [ ] `./gradlew clean build -x test` 빌드 성공 확인
-- [ ] AWS RDS 생성 (MySQL 8.0, db.t3.micro)
-  - DB 이름: `gitmanager`
-  - 보안그룹: EC2 → RDS 3306 인바운드 허용
-- [ ] AWS EC2 생성 (Ubuntu 22.04, t2.micro)
-  - 보안그룹 인바운드: 22(SSH), 8080(앱) 오픈
-- [ ] EC2에 Java 21 설치: `sudo apt install -y openjdk-21-jre-headless`
-- [ ] JAR 업로드: `scp -i key.pem build/libs/*.jar ubuntu@<EC2_IP>:/home/ubuntu/app.jar`
-- [ ] EC2 환경변수 설정 후 앱 기동 (아래 참조)
-
-### EC2 기동 명령어
-```bash
-export DB_HOST=<RDS_ENDPOINT>
-export DB_USERNAME=<RDS_USERNAME>
-export DB_PASSWORD=<RDS_PASSWORD>
-export JWT_SECRET=<JWT_SECRET>
-export AES_SECRET_KEY=<AES_SECRET_KEY>
-export MAIL_USERNAME=<GMAIL_ADDRESS>
-export MAIL_PASSWORD=<GMAIL_APP_PASSWORD>
-
-nohup java -Dspring.profiles.active=prod -jar app.jar > app.log 2>&1 &
-tail -f app.log   # 기동 로그 확인
-```
-
-### 시연 순서
-| # | 행동 | 확인 포인트 |
-|---|------|-------------|
-| 1 | `POST http://<EC2_IP>:8080/api/auth/register` 호출 | `{"success": true}` 응답 + 이메일 인증 메일 수신 |
-| 2 | 이메일 인증 링크 클릭 (또는 토큰 직접 입력) | 인증 완료 응답 확인 |
-| 3 | `POST http://<EC2_IP>:8080/api/auth/login` 호출 | `accessToken`, `refreshToken` 발급 확인 |
-| 4 | MySQL Workbench로 RDS 접속 후 쿼리 실행 | `password` 컬럼이 `$2a$10$...` 형태(BCrypt) 확인 |
-
-### RDS 암호화 확인 쿼리
-```sql
-SELECT login_id, email, password, email_verified
-FROM users
-ORDER BY created_at DESC
-LIMIT 5;
-```
-→ `password` 값이 `$2a$10$` 로 시작하면 BCrypt 암호화 저장 증명 완료.
+## 6. 배포
+배포 절차, EC2 기동 명령어, 시연 순서 → docs/DEPLOY.md 참조
 
 ---
 
 ## 7. 현재 구현 상태
 
-> 작업 완료 시 이 섹션을 직접 업데이트해.
+> **Claude에게**: 기능 구현을 완료하면 반드시 이 섹션의 체크박스를 직접 업데이트할 것. 사용자가 요청하지 않아도 자동으로 수행한다.
 
 - [x] 프로젝트 세팅 (Spring Boot 3.5.12, MySQL 연결)
 - [x] BaseEntity, ApiResponse, GlobalExceptionHandler 공통 클래스
 - [x] CORS 설정 (WebMvcConfigurer)
 - [x] 기능 1: 회원 관리 + JWT (1차: RT 저장/만료 검증)
-  - [x] UX 개선: 로그인 시 이메일 미인증 계정 → `verify.html`로 자동 리다이렉트 (loginId 입력 시에도 실제 이메일 자동 전달)
+  - [x] UX 개선: 로그인 시 이메일 미인증 계정 → `/verify?email=xxx`로 자동 리다이렉트 (loginId 입력 시에도 실제 이메일 자동 전달)
+  - [x] `GET /api/auth/me` — 페이지 새로고침 후 세션 복구용 (userId, loginId, name, email 반환)
 - [x] 기능 2: 팀 프로젝트 관리 (초대 코드 방식)
 - [x] 기능 3: 개인 ToDo
-- [ ] 기능 4: Develop Board
-- [ ] 기능 5: GitHub Webhook 연동
+- [x] 기능 4: Develop Board
+  - [x] 카드 CRUD (생성/조회/수정/삭제/상태변경)
+  - [x] 담당자 다대다 (card_assignees)
+  - [x] 댓글 CRUD (soft delete, 작성자만 삭제)
+  - [x] Branch 연결/해제
+  - [x] Comment 엔티티 BaseEntity 상속 (createdAt/updatedAt JPA Auditing 자동 처리)
+  - [ ] 이미지 업로드 (S3) — 추후 구현
+- [x] 기능 5: GitHub Webhook 연동
+  - [x] ProjectGithub 엔티티 / GitHub 연동 설정 API (OWNER 전용, PAT Jasypt 암호화)
+  - [x] Webhook 수신 처리 (X-Hub-Signature-256 검증)
+  - [x] branch 생성 → 카드 자동 생성 (IN_PROGRESS)
+  - [x] commit push → 커밋 이력 저장
+  - [x] PR merge (main/master) → 카드 DONE 전환
 - [ ] 기능 1 (2차): RTR 추가 적용
-- [ ] 기능 6: 캘린더
-- [ ] 기능 7: 대시보드
+- [x] 기능 6: 캘린더 (일정 CRUD, 기간 조회)
+- [x] 기능 7: 대시보드 (카드 현황 요약, 최근 커밋 10개, 멤버별 담당 카드 수)
+- [x] SpaController — React SPA 클라이언트 라우팅 지원 (`/login`, `/board` 등 새로고침 시 index.html 반환)
+- [x] SecurityConfig permitAll 수정 — `/assets/**`, `/favicon.svg`, `/icons.svg` 추가 (비로그인 React 앱 로드 보장)
 - [ ] Docker 빌드
-- [ ] AWS 배포
-  - [ ] 배포 전 체크: RefreshToken 쿠키에 `setSecure(true)`, `setSameSite("Strict")` 추가 (AuthService.java - setRefreshTokenCookie)
-  - [ ] 배포 전 체크: `application.yaml` `show-sql: true` → `false` 로 변경 (또는 배포용 프로파일에서 override)
+- [ ] AWS 배포 (배포 전 체크리스트 → docs/DEPLOY.md)
 
-**프론트엔드 (백엔드 완성 후 React로 개발)**
-- [ ] 프론트 프로젝트 세팅 (Vite + React)
-- [ ] 기능 1: 회원가입 / 로그인 / 이메일 인증 페이지
-- [ ] 기능 2: 사이드바 + 팀 프로젝트 관리 페이지
+**프론트엔드** — 상세 설계·디자인 시스템 → `docs/FRONTEND.md`
+
+- [x] 프로젝트 세팅 (Vite + React + Tailwind v4 + shadcn/ui)
+- [x] 모노레포 구조 전환 (`gitmanager/frontend/`) + 빌드 outDir → `../src/main/resources/static`
+- [ ] 기능 1: 로그인 / 회원가입 / 이메일 인증 페이지
+- [ ] 기능 2: 사이드바 + 팀 프로젝트 관리
 - [ ] 기능 3: 개인 ToDo 페이지
 - [ ] 기능 4: Develop Board (칸반)
 - [ ] 기능 6: 캘린더 페이지
 - [ ] 기능 7: 대시보드 페이지
-- [ ] 프론트 배포 (React 빌드 결과물 → Spring Boot static 폴더 → EC2 단일 배포)
+- [ ] 기능 8: 프로젝트 설정 (GitHub 연동, 멤버 관리, 초대코드)
+- [ ] 배포
 
 ---

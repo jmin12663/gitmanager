@@ -13,7 +13,8 @@ import java.util.Optional;
 
 public interface UserProjectRepository extends JpaRepository<UserProject, UserProjectId> {
 
-    List<UserProject> findByUser(User user);
+    @Query("SELECT up FROM UserProject up JOIN FETCH up.project WHERE up.user = :user")
+    List<UserProject> findByUserWithProject(@Param("user") User user);
 
     List<UserProject> findByProject(Project project);
 
@@ -23,4 +24,7 @@ public interface UserProjectRepository extends JpaRepository<UserProject, UserPr
 
     @Query("SELECT up FROM UserProject up JOIN FETCH up.user WHERE up.project = :project")
     List<UserProject> findByProjectWithUser(@Param("project") Project project);
+
+    @Query("SELECT up FROM UserProject up JOIN FETCH up.user WHERE up.project.id = :projectId")
+    List<UserProject> findByProjectIdWithUser(@Param("projectId") Long projectId);
 }

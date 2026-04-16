@@ -36,9 +36,12 @@ public class SecurityConfig {
                                 "/api/auth/login",       // 로그인
                                 "/api/auth/refresh",     // 토큰 재발급
                                 "/api/webhook/**",       // GitHub Webhook (JWT 대신 GitHub Secret으로 검증)
-                                "/*.html",               // 시연용 static HTML
                                 "/",                     // 루트
-                                "/static/**"             // static 리소스
+                                "/assets/**",            // React 빌드 번들 (JS, CSS)
+                                "/favicon.svg",          // 파비콘
+                                "/icons.svg",            // 아이콘
+                                "/{path:^(?!api)[^\\.]*}",   // SPA 클라이언트 라우팅 (/login, /board 등 새로고침 지원)
+                                "/{path:^(?!api)[^\\.]*}/**" // SPA 중첩 경로
                         ).permitAll()
                         // 그 외 모든 요청은 로그인(토큰) 필요
                         .anyRequest().authenticated()

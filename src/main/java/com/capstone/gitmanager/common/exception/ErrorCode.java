@@ -17,8 +17,8 @@ public enum ErrorCode {
     EMAIL_ALREADY_EXISTS(HttpStatus.CONFLICT, "EMAIL_ALREADY_EXISTS", "이미 사용 중인 이메일입니다."),
     LOGIN_ID_ALREADY_EXISTS(HttpStatus.CONFLICT, "LOGIN_ID_ALREADY_EXISTS", "이미 사용 중인 아이디입니다."),
     EMAIL_NOT_VERIFIED(HttpStatus.UNAUTHORIZED, "EMAIL_NOT_VERIFIED", "이메일 인증이 필요합니다."),
-    INVALID_EMAIL_TOKEN(HttpStatus.BAD_REQUEST, "INVALID_EMAIL_TOKEN", "유효하지 않은 이메일 인증 토큰입니다."),
-    EMAIL_TOKEN_EXPIRED(HttpStatus.BAD_REQUEST, "EMAIL_TOKEN_EXPIRED", "만료된 이메일 인증 토큰입니다."),
+    INVALID_EMAIL_TOKEN(HttpStatus.BAD_REQUEST, "INVALID_EMAIL_TOKEN", "유효하지 않은 이메일 인증 번호입니다."),
+    EMAIL_TOKEN_EXPIRED(HttpStatus.BAD_REQUEST, "EMAIL_TOKEN_EXPIRED", "만료된 이메일 인증 번호입니다."),
     INVALID_PASSWORD(HttpStatus.UNAUTHORIZED, "INVALID_PASSWORD", "비밀번호가 올바르지 않습니다."),
     INVALID_TOKEN(HttpStatus.UNAUTHORIZED, "INVALID_TOKEN", "유효하지 않은 토큰입니다."),
     TOKEN_EXPIRED(HttpStatus.UNAUTHORIZED, "TOKEN_EXPIRED", "만료된 토큰입니다."),
@@ -32,12 +32,12 @@ public enum ErrorCode {
     PROJECT_MEMBER_NOT_FOUND(HttpStatus.NOT_FOUND, "PROJECT_MEMBER_NOT_FOUND", "프로젝트 멤버를 찾을 수 없습니다."),
     ALREADY_PROJECT_MEMBER(HttpStatus.CONFLICT, "ALREADY_PROJECT_MEMBER", "이미 프로젝트 멤버입니다."),
     INVALID_INVITE_CODE(HttpStatus.BAD_REQUEST, "INVALID_INVITE_CODE", "유효하지 않은 초대 코드입니다."),
-    OWNER_CANNOT_LEAVE(HttpStatus.BAD_REQUEST, "OWNER_CANNOT_LEAVE", "OWNER는 멤버가 있을 경우 새 OWNER를 지정해야 합니다."),
     NEW_OWNER_REQUIRED(HttpStatus.BAD_REQUEST, "NEW_OWNER_REQUIRED", "탈퇴 전 새 OWNER를 지정해야 합니다."),
 
     // Card
     CARD_NOT_FOUND(HttpStatus.NOT_FOUND, "CARD_NOT_FOUND", "카드를 찾을 수 없습니다."),
     COMMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "COMMENT_NOT_FOUND", "댓글을 찾을 수 없습니다."),
+    BRANCH_NOT_FOUND(HttpStatus.NOT_FOUND, "BRANCH_NOT_FOUND", "연결된 브랜치를 찾을 수 없습니다."),
 
     // GitHub
     GITHUB_NOT_CONFIGURED(HttpStatus.BAD_REQUEST, "GITHUB_NOT_CONFIGURED", "GitHub 연동이 설정되지 않았습니다."),

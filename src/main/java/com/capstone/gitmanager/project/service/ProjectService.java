@@ -57,7 +57,7 @@ public class ProjectService {
 
     public List<ProjectResponse> getMyProjects(Long userId) {
         User user = getUser(userId);
-        return userProjectRepository.findByUser(user).stream()
+        return userProjectRepository.findByUserWithProject(user).stream()
                 .map(up -> ProjectResponse.from(up.getProject(), up.getRole()))
                 .toList();
     }
