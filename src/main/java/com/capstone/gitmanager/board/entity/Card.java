@@ -10,7 +10,9 @@ import org.hibernate.annotations.SQLRestriction;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import static lombok.AccessLevel.PROTECTED;
 
@@ -43,13 +45,12 @@ public class Card extends BaseEntity {
     @Column(nullable = false)
     private boolean isDeleted = false;
 
-    @Column(nullable = false)
     private Long createdBy;
 
     private LocalDateTime mergedAt;
 
     @OneToMany(mappedBy = "card", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<CardAssignee> assignees = new ArrayList<>();
+    private Set<CardAssignee> assignees = new HashSet<>();
 
     @OneToMany(mappedBy = "card", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<CardBranch> branches = new ArrayList<>();

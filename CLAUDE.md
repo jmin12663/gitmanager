@@ -2,12 +2,9 @@
 
 > 이 파일은 Claude Code가 매 작업마다 자동으로 읽는 컨텍스트야.
 > 코드를 생성하기 전에 반드시 이 파일 전체를 숙지해.
-> 세부 계획은 CAPSTONE_PLAN.md, ERD는 docs/ERD.md 참조.
-
-> **작업 시작 전 필수 파일 로드 규칙**
-> - 백엔드(Entity/Repository/Service/Controller) 작업 시: 코드 작성 전 반드시 `docs/ERD.md`
-> - 프론트엔드(React 컴포넌트/페이지/API 연동) 작업 시: 코드 작성 전 반드시 `docs/FRONTEND.md`
-> - 배포(Docker/EC2/환경변수) 작업 시: 반드시 `docs/DEPLOY.md` 를 읽을 것
+> 모르는건 임의로 구현 금지
+> 구현하기 전 무조건 허락 맡기
+> 백엔드 구현시 데이터 베이스 ERD는 docs/ERD.md 참조.
 
 ## 0. 작업 원칙 — 수정 전 반드시 확인
 
@@ -246,25 +243,13 @@ JPA @SQLRestriction("is_deleted = false") 자동 필터링
 
 ---
 
-## 5. DB 핵심 테이블 구조
 
-상세 스키마 → docs/ERD.md 참조
-
-핵심 관계 요약:
-- `user_project`: 복합 PK (user_id, project_id), role = OWNER/MEMBER — OWNER만 프로젝트 삭제·강퇴·초대코드 재발급 가능
-- `card_branch`: 복합 PK (card_id, branch_name)
-- `card_assignees`: 복합 PK (card_id, user_id)
-- `commit_logs`: commit_sha UNIQUE → 중복 Webhook 방지
-- `project_github`: project_id가 PK이자 FK, PAT는 Jasypt 암호화 (AES_SECRET_KEY)
-
----
-
-## 6. 배포
+## 5. 배포
 배포 절차, EC2 기동 명령어, 시연 순서 → docs/DEPLOY.md 참조
 
 ---
 
-## 7. 현재 구현 상태
+## 6. 현재 구현 상태
 
 > **Claude에게**: 기능 구현을 완료하면 반드시 이 섹션의 체크박스를 직접 업데이트할 것. 사용자가 요청하지 않아도 자동으로 수행한다.
 

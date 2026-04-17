@@ -2,6 +2,18 @@
 
 ---
 
+## DB 핵심 테이블 구조
+```
+핵심 관계 요약:
+- `user_project`: 복합 PK (user_id, project_id), role = OWNER/MEMBER — OWNER만 프로젝트 삭제·강퇴·초대코드 재발급 가능
+- `card_branch`: 복합 PK (card_id, branch_name)
+- `card_assignees`: 복합 PK (card_id, user_id)
+- `commit_logs`: commit_sha UNIQUE → 중복 Webhook 방지
+- `project_github`: project_id가 PK이자 FK, PAT는 Jasypt 암호화 (AES_SECRET_KEY)
+```
+
+---
+
 ## 테이블 관계 요약
 
 ```

@@ -35,12 +35,4 @@ public class ProjectGithubController {
         return ApiResponse.ok(projectGithubService.registerGithubConfig(projectId, userId, request));
     }
 
-    @PutMapping
-    public ApiResponse<ProjectGithubResponse> updateGithubConfig(
-            @PathVariable Long projectId,
-            @AuthenticationPrincipal Long userId,
-            @Valid @RequestBody ProjectGithubRequest request
-    ) {
-        return ApiResponse.ok(projectGithubService.updateGithubConfig(projectId, userId, request));
-    }
 }

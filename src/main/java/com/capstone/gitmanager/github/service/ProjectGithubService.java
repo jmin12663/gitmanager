@@ -8,6 +8,7 @@ import com.capstone.gitmanager.github.entity.ProjectGithub;
 import com.capstone.gitmanager.github.repository.ProjectGithubRepository;
 import com.capstone.gitmanager.project.entity.ProjectRole;
 import com.capstone.gitmanager.project.entity.UserProjectId;
+import java.util.Optional;
 import com.capstone.gitmanager.project.repository.ProjectRepository;
 import com.capstone.gitmanager.project.repository.UserProjectRepository;
 import lombok.RequiredArgsConstructor;
@@ -15,7 +16,6 @@ import org.jasypt.encryption.StringEncryptor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -56,17 +56,6 @@ public class ProjectGithubService {
                 .webhookSecret(request.webhookSecret())
                 .build();
         projectGithubRepository.save(github);
-        return ProjectGithubResponse.from(github);
-    }
-
-    @Transactional
-    public ProjectGithubResponse updateGithubConfig(Long projectId, Long userId, ProjectGithubRequest request) {
-        validateOwner(projectId, userId);
-        ProjectGithub github = projectGithubRepository.findById(projectId)
-                .orElseThrow(() -> new CustomException(ErrorCode.GITHUB_NOT_CONFIGURED));
-
-        String encryptedPat = jasyptStringEncryptor.encrypt(request.pat());
-        github.update(request.repoUrl(), request.repoName(), encryptedPat, request.webhookSecret());
         return ProjectGithubResponse.from(github);
     }
 

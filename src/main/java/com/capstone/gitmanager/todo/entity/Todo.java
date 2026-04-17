@@ -1,12 +1,11 @@
 package com.capstone.gitmanager.todo.entity;
 
 import com.capstone.gitmanager.auth.entity.User;
+import com.capstone.gitmanager.common.entity.BaseEntity;
 import jakarta.persistence.*;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-
-import java.time.LocalDateTime;
 
 import static lombok.AccessLevel.PROTECTED;
 
@@ -14,7 +13,7 @@ import static lombok.AccessLevel.PROTECTED;
 @Table(name = "todos")
 @Getter
 @NoArgsConstructor(access = PROTECTED)
-public class Todo {
+public class Todo extends BaseEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -30,14 +29,10 @@ public class Todo {
     @Column(nullable = false)
     private boolean isDone = false;
 
-    @Column(nullable = false)
-    private LocalDateTime createdAt;
-
     @Builder
     private Todo(User user, String content) {
         this.user = user;
         this.content = content;
-        this.createdAt = LocalDateTime.now();
     }
 
     public void toggleDone() {

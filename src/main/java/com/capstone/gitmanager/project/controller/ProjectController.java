@@ -38,7 +38,7 @@ public class ProjectController {
         return ApiResponse.ok(projectService.getProject(userId, projectId));
     }
 
-    @PutMapping("/{projectId}")
+    @PatchMapping("/{projectId}")
     public ApiResponse<ProjectResponse> updateProject(
             @AuthenticationPrincipal Long userId,
             @PathVariable Long projectId,
