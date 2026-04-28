@@ -2,10 +2,13 @@ package com.capstone.gitmanager.board.repository;
 
 import com.capstone.gitmanager.board.entity.Comment;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 
 public interface CommentRepository extends JpaRepository<Comment, Long> {
 
-    List<Comment> findAllByCardId(Long cardId);
+    @Query("SELECT c FROM Comment c JOIN FETCH c.user WHERE c.card.id = :cardId")
+    List<Comment> findAllByCardId(@Param("cardId") Long cardId);
 }

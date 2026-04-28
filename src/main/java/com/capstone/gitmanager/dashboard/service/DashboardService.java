@@ -51,7 +51,7 @@ public class DashboardService {
 
         List<UserProject> userProjects = userProjectRepository.findByProjectIdWithUser(projectId);
         List<MemberSummaryResponse> members = userProjects.stream()
-                .map(up -> MemberSummaryResponse.of(
+                .map(up -> MemberSummaryResponse.from(
                         up,
                         assignedCountByUser.getOrDefault(up.getUser().getId(), 0L).intValue()
                 ))

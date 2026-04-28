@@ -9,7 +9,7 @@ public record MemberSummaryResponse(
         ProjectRole role,
         int assignedCardCount
 ) {
-    public static MemberSummaryResponse of(UserProject userProject, int assignedCardCount) {
+    public static MemberSummaryResponse from(UserProject userProject, int assignedCardCount) {
         return new MemberSummaryResponse(
                 userProject.getUser().getId(),
                 userProject.getUser().getName(),

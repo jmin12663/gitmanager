@@ -1,9 +1,13 @@
 package com.capstone.gitmanager.common.config;
 
+import com.capstone.gitmanager.common.exception.ErrorCode;
 import com.capstone.gitmanager.common.util.JwtUtil;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.MediaType;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -13,12 +17,15 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
+import java.util.Map;
+
 @Configuration
 @EnableWebSecurity
 @RequiredArgsConstructor
 public class SecurityConfig {
 
     private final JwtUtil jwtUtil;
+    private final ObjectMapper objectMapper;
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
@@ -34,15 +41,36 @@ public class SecurityConfig {
                                 "/api/auth/register",    // 회원가입
                                 "/api/auth/verify-email",// 이메일 인증
                                 "/api/auth/login",       // 로그인
+                                "/api/auth/logout",      // 로그아웃 (만료 토큰으로도 가능해야 함)
                                 "/api/auth/refresh",     // 토큰 재발급
                                 "/api/webhook/**"        // GitHub Webhook (JWT 대신 GitHub Secret으로 검증)
                         ).permitAll()
+                        .requestMatchers(
+                                "/",
+                                "/assets/**",
+                                "/favicon.svg",
+                                "/icons.svg",
+                                "/{path:^(?!api)[^\\.]*}",
+                                "/{path:^(?!api)[^\\.]*}/**"
+                        ).permitAll() // React SPA 라우팅
                         // 그 외 모든 요청은 로그인(토큰) 필요
                         .anyRequest().authenticated()
                 )
+                .exceptionHandling(ex -> ex
+                        .authenticationEntryPoint((request, response, e) -> {
+                            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                            response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+                            response.setCharacterEncoding("UTF-8");
+                            objectMapper.writeValue(response.getWriter(),
+                                    Map.of("success", false,
+                                            "error", Map.of(
+                                                    "code", ErrorCode.UNAUTHORIZED.getCode(),
+                                                    "message", ErrorCode.UNAUTHORIZED.getMessage())));
+                        })
+                )
                 // JwtAuthenticationFilter를 Spring Security 필터 체인에 등록
                 // UsernamePasswordAuthenticationFilter 이전에 실행되도록 설정
-                .addFilterBefore(new JwtAuthenticationFilter(jwtUtil),
+                .addFilterBefore(new JwtAuthenticationFilter(jwtUtil, objectMapper),
                         UsernamePasswordAuthenticationFilter.class);
 
         return http.build();

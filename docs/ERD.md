@@ -107,8 +107,6 @@ CREATE TABLE project_github (
     repo_name      VARCHAR(255) NOT NULL,
     pat_encrypted  VARCHAR(500) NOT NULL,
     webhook_secret VARCHAR(255) NOT NULL,
-    created_at     DATETIME(6)  NOT NULL,
-    updated_at     DATETIME(6)  NOT NULL,
     PRIMARY KEY (project_id),
     FOREIGN KEY (project_id) REFERENCES projects (id) ON DELETE CASCADE
 );
@@ -117,13 +115,14 @@ CREATE TABLE project_github (
 -- status: BACKLOG / IN_PROGRESS / DONE
 -- is_deleted: Soft Delete (JPA @SQLRestriction 으로 자동 필터링)
 -- merged_at: main merge 시 기록
+-- image_url: 미구현 (S3 업로드 추후 추가 예정)
 CREATE TABLE cards (
     id         BIGINT        NOT NULL AUTO_INCREMENT,
     project_id BIGINT        NOT NULL,
     title      VARCHAR(255)  NOT NULL,
     status     VARCHAR(20)   NOT NULL DEFAULT 'BACKLOG',
     due_date   DATE,
-    memo       VARCHAR(1000),
+    memo       TEXT,
     is_deleted BOOLEAN       NOT NULL DEFAULT FALSE,
     created_by BIGINT        NOT NULL,
     merged_at  DATETIME(6),
@@ -156,25 +155,25 @@ CREATE TABLE card_branch (
 -- commit 이력
 -- commit_sha UNIQUE → 동일 Webhook 중복 수신 방지 (멱등성)
 CREATE TABLE commit_logs (
-    id           BIGINT       NOT NULL AUTO_INCREMENT,
-    card_id      BIGINT       NOT NULL,
-    commit_sha   VARCHAR(40)  NOT NULL UNIQUE,
-    message      VARCHAR(500) NOT NULL,
-    author       VARCHAR(100) NOT NULL,
-    committed_at DATETIME(6)  NOT NULL,
+    id           BIGINT      NOT NULL AUTO_INCREMENT,
+    card_id      BIGINT      NOT NULL,
+    commit_sha   VARCHAR(40) NOT NULL UNIQUE,
+    message      TEXT,
+    author       VARCHAR(100),
+    committed_at DATETIME(6),
     PRIMARY KEY (id),
     FOREIGN KEY (card_id) REFERENCES cards (id) ON DELETE CASCADE
 );
 
 -- 댓글 (is_deleted: Soft Delete, 수정 기능 없음)
 CREATE TABLE comments (
-    id         BIGINT        NOT NULL AUTO_INCREMENT,
-    card_id    BIGINT        NOT NULL,
-    user_id    BIGINT        NOT NULL,
-    content    VARCHAR(1000) NOT NULL,
-    is_deleted BOOLEAN       NOT NULL DEFAULT FALSE,
-    created_at DATETIME(6)   NOT NULL,
-    updated_at DATETIME(6)   NOT NULL,
+    id         BIGINT   NOT NULL AUTO_INCREMENT,
+    card_id    BIGINT   NOT NULL,
+    user_id    BIGINT   NOT NULL,
+    content    TEXT     NOT NULL,
+    is_deleted BOOLEAN  NOT NULL DEFAULT FALSE,
+    created_at DATETIME(6)  NOT NULL,
+    updated_at DATETIME(6)  NOT NULL,
     PRIMARY KEY (id),
     FOREIGN KEY (card_id) REFERENCES cards (id) ON DELETE CASCADE,
     FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
@@ -195,13 +194,14 @@ CREATE TABLE schedules (
     FOREIGN KEY (created_by) REFERENCES users    (id)
 );
 
--- 개인 ToDo (수정 기능 있으나 수정 시점 추적 불필요)
+-- 개인 ToDo (BaseEntity 상속 → created_at, updated_at 자동 관리)
 CREATE TABLE todos (
     id         BIGINT       NOT NULL AUTO_INCREMENT,
     user_id    BIGINT       NOT NULL,
     content    VARCHAR(500) NOT NULL,
     is_done    BOOLEAN      NOT NULL DEFAULT FALSE,
     created_at DATETIME(6)  NOT NULL,
+    updated_at DATETIME(6)  NOT NULL,
     PRIMARY KEY (id),
     FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
 );
@@ -217,9 +217,9 @@ CREATE TABLE todos (
 | `commit_logs.commit_sha` UNIQUE | Webhook 중복 수신 시 멱등성 보장 |
 | `cards.is_deleted`, `comments.is_deleted` | Soft Delete — commit_logs, comments 연쇄 삭제 방지 |
 | `comments` 에 `updated_at` 있음 | BaseEntity 상속으로 JPA Auditing 자동 관리 (수정 API는 없지만 Auditing 일관성 유지) |
-| `todos` 에 `updated_at` 없음 | 개인 일정, 수정 시점 추적 불필요 |
+| `todos` 에 `updated_at` 있음 | BaseEntity 상속으로 JPA Auditing 자동 관리 |
 | `project_github` PK = project_id | 프로젝트당 GitHub repo 1개 고정 |
-| `project_github` 에 `created_at`, `updated_at` | PAT 암호화 데이터, 등록·수정 시점 감사 필요 |
+| `project_github` 에 `created_at`, `updated_at` 없음 | BaseEntity 미상속, 시점 추적 불필요 |
 | `user_project.role` OWNER/MEMBER | 초대 코드 조회·재발급, 팀원 강퇴 권한 분리 |
 | `card_assignees` 별도 테이블 | 카드-유저 다대다, 복합 PK (card_id, user_id) |
 | `refresh_tokens.is_used` | 1차 미사용, 8주차 RTR 적용 시 활성화 |

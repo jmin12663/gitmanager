@@ -38,6 +38,7 @@ public class WebhookController {
 
         switch (event) {
             case "create" -> webhookService.handleCreate(payload);
+            case "delete" -> webhookService.handleDelete(payload);
             case "push" -> webhookService.handlePush(payload);
             case "pull_request" -> webhookService.handlePullRequest(payload);
             default -> { /* 처리하지 않는 이벤트 무시 */ }

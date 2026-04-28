@@ -2,11 +2,13 @@ package com.capstone.gitmanager.common.config;
 
 import com.capstone.gitmanager.common.exception.CustomException;
 import com.capstone.gitmanager.common.util.JwtUtil;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.util.StringUtils;
@@ -14,12 +16,14 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 
 // 토큰 검증
 @RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtUtil jwtUtil;
+    private final ObjectMapper objectMapper;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
@@ -39,8 +43,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 UsernamePasswordAuthenticationToken authentication =
                         new UsernamePasswordAuthenticationToken(userId, null, List.of());
                 SecurityContextHolder.getContext().setAuthentication(authentication);
-            } catch (CustomException ignored) {
-                // 5. 검증 실패 → 인증 없이 통과, SecurityConfig에서 403 처리
+            } catch (CustomException e) {
+                // 5. 토큰이 존재하지만 만료/위조된 경우 → 401 직접 반환
+                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+                response.setCharacterEncoding("UTF-8");
+                objectMapper.writeValue(response.getWriter(),
+                        Map.of("success", false,
+                                "error", Map.of("code", e.getErrorCode().getCode(),
+                                        "message", e.getErrorCode().getMessage())));
+                return;
             }
         }
 

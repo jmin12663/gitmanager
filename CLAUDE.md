@@ -3,7 +3,7 @@
 > 이 파일은 Claude Code가 매 작업마다 자동으로 읽는 컨텍스트야.
 > 코드를 생성하기 전에 반드시 이 파일 전체를 숙지해.
 > 모르는건 임의로 구현 금지
-> 구현하기 전 무조건 허락 맡기
+> 구현하기 전 무조건 보고 먼저 할 것 
 > 백엔드 구현시 데이터 베이스 ERD는 docs/ERD.md 참조.
 
 ## 0. 작업 원칙 — 수정 전 반드시 확인
@@ -85,36 +85,11 @@ com.capstone.gitmanager
 - Lombok 사용: `@Getter`만. `@Setter` 절대 금지
 - `@ToString`에 연관관계 필드 제외 (`exclude` 사용)
 
-```java
-// BaseEntity 예시
-@MappedSuperclass
-@EntityListeners(AuditingEntityListener.class)
-public abstract class BaseEntity {
-    @CreatedDate
-    private LocalDateTime createdAt;
-    @LastModifiedDate
-    private LocalDateTime updatedAt;
-}
-```
-
 ### DTO 규칙
 - Request DTO: `@Valid` 어노테이션으로 검증
 - Response DTO: `record` 사용 권장
 - Entity ↔ DTO 변환은 DTO 안에 `from()` 정적 메서드로 처리
 - Entity를 Controller까지 올리지 말 것
-
-```java
-// Response DTO 예시
-public record ProjectResponse(
-    Long id,
-    String name,
-    String description
-) {
-    public static ProjectResponse from(Project project) {
-        return new ProjectResponse(project.getId(), project.getName(), project.getDescription());
-    }
-}
-```
 
 ### Service 규칙
 - `@Transactional(readOnly = true)` 기본, 쓰기 작업만 `@Transactional`
@@ -138,18 +113,6 @@ public record ProjectResponse(
     "code": "USER_NOT_FOUND",
     "message": "사용자를 찾을 수 없습니다."
   }
-}
-```
-
-```java
-// ApiResponse 클래스
-public record ApiResponse<T>(boolean success, T data, ErrorResponse error) {
-    public static <T> ApiResponse<T> ok(T data) {
-        return new ApiResponse<>(true, data, null);
-    }
-    public static ApiResponse<?> fail(ErrorCode code) {
-        return new ApiResponse<>(false, null, new ErrorResponse(code));
-    }
 }
 ```
 
@@ -188,11 +151,7 @@ public record ApiResponse<T>(boolean success, T data, ErrorResponse error) {
 ## 4. 핵심 도메인 로직 — 반드시 숙지
 
 ### Board 카드 ↔ GitHub branch 연동 구조
-```
-cards         : id, project_id, title, status, assignee_id, due_date, memo, image_url, is_deleted, created_by, merged_at
-card_branch   : card_id, branch_name, repo_name, created_at  ← 복합 PK(card_id, branch_name)
-commit_logs   : id, card_id, commit_sha UNIQUE, message, author, committed_at
-```
+> 테이블 상세 스키마는 docs/ERD.md 참조.
 
 **카드 생성 — 두 가지 진입점**
 - 진입점 A (카드 먼저): 팀원이 카드 생성 → branch 이름 연결 → Webhook으로 자동 갱신
@@ -209,6 +168,7 @@ POST /api/webhook/github 수신
 → X-Hub-Signature-256 헤더로 GitHub Secret 검증 (검증 실패 시 403)
 → event 타입 분기
    └── "create" (branch 생성): card_branch 조회 → 없으면 미연결 카드 생성 (status: IN_PROGRESS)
+   └── "delete" (branch 삭제): card_branch 연결 레코드 제거 (카드는 유지)
    └── "push"  (commit push) : branch_name으로 카드 조회 → IN_PROGRESS 전환 + commit_logs 저장
                                commit_sha UNIQUE 제약으로 중복 수신 방지
    └── "pull_request" (merge): merged=true 확인 → DONE 전환 + merge 시간 기록
@@ -225,14 +185,7 @@ POST /api/webhook/github 수신
 ```
 
 ### 이미지 업로드 (서버 중계 방식)
-```
-React → 서버로 이미지 전송
-→ 서버가 S3에 업로드
-→ S3 URL을 DB cards 테이블 image_url에 저장
-- 허용 확장자: jpg, jpeg, png, gif
-- 파일 크기 제한: 10MB
-- S3 버킷 경로: cards/{card_id}/{filename}
-```
+> 미구현. 구현 시 CAPSTONE_PLAN.md 기능 4 참조.
 
 ### Soft Delete 전략
 ```
@@ -243,56 +196,17 @@ JPA @SQLRestriction("is_deleted = false") 자동 필터링
 
 ---
 
-
 ## 5. 배포
 배포 절차, EC2 기동 명령어, 시연 순서 → docs/DEPLOY.md 참조
 
 ---
 
+## 5-1. 프론트엔드 구현 가이드
+폴더 구조, 레이아웃, 라우트, 인증 흐름, API 규칙 → docs/FRONTEND.md 참조
+
+---
+
 ## 6. 현재 구현 상태
-
-> **Claude에게**: 기능 구현을 완료하면 반드시 이 섹션의 체크박스를 직접 업데이트할 것. 사용자가 요청하지 않아도 자동으로 수행한다.
-
-- [x] 프로젝트 세팅 (Spring Boot 3.5.12, MySQL 연결)
-- [x] BaseEntity, ApiResponse, GlobalExceptionHandler 공통 클래스
-- [x] CORS 설정 (WebMvcConfigurer)
-- [x] 기능 1: 회원 관리 + JWT (1차: RT 저장/만료 검증)
-  - [x] UX 개선: 로그인 시 이메일 미인증 계정 → `/verify?email=xxx`로 자동 리다이렉트 (loginId 입력 시에도 실제 이메일 자동 전달)
-  - [x] `GET /api/auth/me` — 페이지 새로고침 후 세션 복구용 (userId, loginId, name, email 반환)
-- [x] 기능 2: 팀 프로젝트 관리 (초대 코드 방식)
-- [x] 기능 3: 개인 ToDo
-- [x] 기능 4: Develop Board
-  - [x] 카드 CRUD (생성/조회/수정/삭제/상태변경)
-  - [x] 담당자 다대다 (card_assignees)
-  - [x] 댓글 CRUD (soft delete, 작성자만 삭제)
-  - [x] Branch 연결/해제
-  - [x] Comment 엔티티 BaseEntity 상속 (createdAt/updatedAt JPA Auditing 자동 처리)
-  - [ ] 이미지 업로드 (S3) — 추후 구현
-- [x] 기능 5: GitHub Webhook 연동
-  - [x] ProjectGithub 엔티티 / GitHub 연동 설정 API (OWNER 전용, PAT Jasypt 암호화)
-  - [x] Webhook 수신 처리 (X-Hub-Signature-256 검증)
-  - [x] branch 생성 → 카드 자동 생성 (IN_PROGRESS)
-  - [x] commit push → 커밋 이력 저장
-  - [x] PR merge (main/master) → 카드 DONE 전환
-- [ ] 기능 1 (2차): RTR 추가 적용
-- [x] 기능 6: 캘린더 (일정 CRUD, 기간 조회)
-- [x] 기능 7: 대시보드 (카드 현황 요약, 최근 커밋 10개, 멤버별 담당 카드 수)
-- [x] SpaController — React SPA 클라이언트 라우팅 지원 (`/login`, `/board` 등 새로고침 시 index.html 반환)
-- [x] SecurityConfig permitAll 수정 — `/assets/**`, `/favicon.svg`, `/icons.svg` 추가 (비로그인 React 앱 로드 보장)
-- [ ] Docker 빌드
-- [ ] AWS 배포 (배포 전 체크리스트 → docs/DEPLOY.md)
-
-**프론트엔드** — 상세 설계·디자인 시스템 → `docs/FRONTEND.md`
-
-- [x] 프로젝트 세팅 (Vite + React + Tailwind v4 + shadcn/ui)
-- [x] 모노레포 구조 전환 (`gitmanager/frontend/`) + 빌드 outDir → `../src/main/resources/static`
-- [ ] 기능 1: 로그인 / 회원가입 / 이메일 인증 페이지
-- [ ] 기능 2: 사이드바 + 팀 프로젝트 관리
-- [ ] 기능 3: 개인 ToDo 페이지
-- [ ] 기능 4: Develop Board (칸반)
-- [ ] 기능 6: 캘린더 페이지
-- [ ] 기능 7: 대시보드 페이지
-- [ ] 기능 8: 프로젝트 설정 (GitHub 연동, 멤버 관리, 초대코드)
-- [ ] 배포
+구현 진행 현황 → STATUS.md 참조
 
 ---

@@ -1,7 +1,9 @@
 package com.capstone.gitmanager.common.dto;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.capstone.gitmanager.common.exception.ErrorCode;
 
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public record ApiResponse<T>(boolean success, T data, ErrorResponse error) {
 
     public static <T> ApiResponse<T> ok(T data) {

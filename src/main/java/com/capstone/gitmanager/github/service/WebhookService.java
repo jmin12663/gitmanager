@@ -103,6 +103,17 @@ public class WebhookService {
     }
 
     @Transactional
+    public void handleDelete(WebhookPayload payload) {
+        if (!"branch".equals(payload.refType)) return;
+
+        String branchName = payload.ref;
+        String repoName = payload.repository.name;
+
+        cardBranchRepository.findByRepoNameAndIdBranchName(repoName, branchName)
+                .ifPresent(cardBranchRepository::delete);
+    }
+
+    @Transactional
     public void handlePullRequest(WebhookPayload payload) {
         if (payload.pullRequest == null || !payload.pullRequest.merged) return;
 

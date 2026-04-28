@@ -51,3 +51,8 @@ src/main/resources/application-secret.yaml
 logs/
 *.log
 frontend/.vite/
+
+### Claude Code ###
+.claude/
+.agents/
+skills-lock.json
