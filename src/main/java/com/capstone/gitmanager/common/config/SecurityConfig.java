@@ -10,6 +10,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.http.MediaType;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -32,18 +33,22 @@ public class SecurityConfig {
         http
                 // REST API이므로 웹사이트 CSRF 비활성화 (JWT로 인증하기 때문에 불필요)
                 .csrf(AbstractHttpConfigurer::disable)
+                // CorsConfig(WebMvcConfigurer)의 설정을 Spring Security에 위임
+                .cors(Customizer.withDefaults())
                 // 세션 미사용 토큰으로만 인증 — JWT 기반 무상태(Stateless) 인증
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         // 로그인 없이 접근 허용하는 경로
                         .requestMatchers(
-                                "/api/auth/register",    // 회원가입
-                                "/api/auth/verify-email",// 이메일 인증
-                                "/api/auth/login",       // 로그인
-                                "/api/auth/logout",      // 로그아웃 (만료 토큰으로도 가능해야 함)
-                                "/api/auth/refresh",     // 토큰 재발급
-                                "/api/webhook/**"        // GitHub Webhook (JWT 대신 GitHub Secret으로 검증)
+                                "/api/auth/send-email-code",  // 이메일 인증코드 전송
+                                "/api/auth/verify-email-code",// 이메일 인증코드 확인
+                                "/api/auth/register",         // 회원가입
+                                "/api/auth/verify-email",     // 이메일 인증 (레거시)
+                                "/api/auth/login",            // 로그인
+                                "/api/auth/logout",           // 로그아웃
+                                "/api/auth/refresh",          // 토큰 재발급
+                                "/api/webhook/**"             // GitHub Webhook
                         ).permitAll()
                         .requestMatchers(
                                 "/",

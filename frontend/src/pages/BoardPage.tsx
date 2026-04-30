@@ -2,13 +2,14 @@ import { useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
 import {
   DndContext,
+  DragOverlay,
   PointerSensor,
   useSensor,
   useSensors,
   useDroppable,
   useDraggable,
 } from '@dnd-kit/core'
-import type { DragEndEvent } from '@dnd-kit/core'
+import type { DragEndEvent, DragStartEvent } from '@dnd-kit/core'
 import type { CardSummary, CardStatus, CardDetail, Comment, BoardData } from '@/types/board'
 import {
   getBoardApi,
@@ -19,7 +20,9 @@ import {
   createCommentApi,
   deleteCommentApi,
   deleteCardApi,
+  addBranchApi,
 } from '@/api/board'
+import { getProjectMembersApi } from '@/api/project'
 
 const AVATAR_COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#3b82f6']
 const avatarColor = (id: number) => AVATAR_COLORS[id % AVATAR_COLORS.length]
@@ -70,13 +73,10 @@ function DraggableCard({ card, onClick }: DraggableCardProps) {
     data: { cardId: card.id, status: card.status },
   })
 
-  const style: React.CSSProperties = transform
-    ? {
-        transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
-        opacity: isDragging ? 0.45 : 1,
-        zIndex: isDragging ? 999 : 1,
-        position: 'relative',
-      }
+  const style: React.CSSProperties = isDragging
+    ? { opacity: 0.3 }
+    : transform
+    ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` }
     : {}
 
   const handleClick = () => {
@@ -151,23 +151,58 @@ function DroppableColumn({ status, title, badgeClass, cards, onAddCard, onCardCl
 }
 
 interface CreateCardModalProps {
+  projectId: number
   onClose: () => void
-  onCreate: (title: string, dueDate: string, memo: string) => Promise<void>
+  onCreate: (
+    title: string,
+    dueDate: string,
+    memo: string,
+    assigneeIds: number[],
+    branches: { branchName: string; repoName: string }[]
+  ) => Promise<void>
 }
 
-function CreateCardModal({ onClose, onCreate }: CreateCardModalProps) {
+function CreateCardModal({ projectId, onClose, onCreate }: CreateCardModalProps) {
   const [title, setTitle] = useState('')
   const [dueDate, setDueDate] = useState('')
   const [memo, setMemo] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
+  const [members, setMembers] = useState<{ userId: number; name: string }[]>([])
+  const [selectedAssigneeIds, setSelectedAssigneeIds] = useState<number[]>([])
+
+  const [branchInput, setBranchInput] = useState('')
+  const [repoInput, setRepoInput] = useState('')
+  const [branches, setBranches] = useState<{ branchName: string; repoName: string }[]>([])
+
+  useEffect(() => {
+    getProjectMembersApi(projectId)
+      .then(res => setMembers(res.data.data.map((m: { userId: number; name: string }) => ({ userId: m.userId, name: m.name }))))
+      .catch(() => {})
+  }, [projectId])
+
+  function toggleAssignee(userId: number) {
+    setSelectedAssigneeIds(prev =>
+      prev.includes(userId) ? prev.filter(id => id !== userId) : [...prev, userId]
+    )
+  }
+
+  function handleAddBranch() {
+    const name = branchInput.trim()
+    const repo = repoInput.trim()
+    if (!name || !repo) return
+    if (branches.some(b => b.branchName === name)) return
+    setBranches(prev => [...prev, { branchName: name, repoName: repo }])
+    setBranchInput('')
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!title.trim()) { setError('제목을 입력하세요.'); return }
     setLoading(true)
     try {
-      await onCreate(title.trim(), dueDate, memo)
+      await onCreate(title.trim(), dueDate, memo, selectedAssigneeIds, branches)
       onClose()
     } catch {
       setError('카드 생성에 실패했습니다.')
@@ -205,6 +240,101 @@ function CreateCardModal({ onClose, onCreate }: CreateCardModalProps) {
               className="card-memo-textarea"
             />
           </div>
+
+          {members.length > 0 && (
+            <div className="auth-field">
+              <label>담당자 (선택)</label>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {members.map(m => {
+                  const selected = selectedAssigneeIds.includes(m.userId)
+                  return (
+                    <label
+                      key={m.userId}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 6,
+                        cursor: 'pointer', padding: '4px 10px', borderRadius: 20,
+                        border: `1px solid ${selected ? 'var(--gm-accent)' : 'var(--gm-border2)'}`,
+                        background: selected ? 'var(--gm-accent)' : 'transparent',
+                        color: selected ? 'white' : 'var(--gm-text2)',
+                        fontSize: 13, transition: 'all 0.15s',
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        style={{ display: 'none' }}
+                        checked={selected}
+                        onChange={() => toggleAssignee(m.userId)}
+                      />
+                      <div className="mini-avatar" style={{ background: avatarColor(m.userId), width: 18, height: 18, fontSize: 10 }}>
+                        {m.name[0]}
+                      </div>
+                      {m.name}
+                    </label>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          <div className="auth-field">
+            <label>브랜치 연결 (선택)</label>
+            <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+              <input
+                type="text"
+                placeholder="Repo (예: gitmanager)"
+                value={repoInput}
+                onChange={e => setRepoInput(e.target.value)}
+                style={{ flex: 1 }}
+              />
+              <input
+                type="text"
+                placeholder="브랜치 (예: feature/login)"
+                value={branchInput}
+                onChange={e => setBranchInput(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddBranch() } }}
+                style={{ flex: 2 }}
+              />
+              <button
+                type="button"
+                onClick={handleAddBranch}
+                disabled={!branchInput.trim() || !repoInput.trim()}
+                style={{
+                  padding: '8px 12px', background: 'var(--gm-bg3)',
+                  border: '1px solid var(--gm-border2)', borderRadius: 'var(--gm-radius)',
+                  cursor: 'pointer', fontSize: 13, color: 'var(--gm-text2)', whiteSpace: 'nowrap',
+                  opacity: !branchInput.trim() || !repoInput.trim() ? 0.4 : 1,
+                }}
+              >
+                추가
+              </button>
+            </div>
+            {branches.length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {branches.map(b => (
+                  <div
+                    key={b.branchName}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 4,
+                      padding: '3px 8px', background: 'var(--gm-bg3)',
+                      border: '1px solid var(--gm-border2)', borderRadius: 12,
+                      fontSize: 12, color: 'var(--gm-text2)',
+                    }}
+                  >
+                    <BranchIcon />
+                    {b.branchName}
+                    <button
+                      type="button"
+                      onClick={() => setBranches(prev => prev.filter(x => x.branchName !== b.branchName))}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--gm-text3)', padding: 0, marginLeft: 2, lineHeight: 1 }}
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
           {error && <div className="auth-error">{error}</div>}
           <button className="auth-btn-primary" type="submit" disabled={loading}>
             {loading ? '생성 중...' : '만들기'}
@@ -410,6 +540,7 @@ export default function BoardPage() {
   const [loading, setLoading] = useState(true)
   const [showCreate, setShowCreate] = useState(false)
   const [selectedCard, setSelectedCard] = useState<CardSummary | null>(null)
+  const [activeCard, setActiveCard] = useState<CardSummary | null>(null)
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
@@ -427,7 +558,15 @@ export default function BoardPage() {
       .finally(() => setLoading(false))
   }
 
+  function handleDragStart(event: DragStartEvent) {
+    const { cardId, status } = event.active.data.current as { cardId: number; status: CardStatus }
+    const key = statusKey(status)
+    const card = boardData[key].find(c => c.id === cardId) ?? null
+    setActiveCard(card)
+  }
+
   async function handleDragEnd(event: DragEndEvent) {
+    setActiveCard(null)
     const { active, over } = event
     if (!over) return
 
@@ -456,11 +595,22 @@ export default function BoardPage() {
     }
   }
 
-  async function handleCreate(title: string, dueDate: string, memo: string) {
-    const body: { title: string; dueDate?: string; memo?: string } = { title }
+  async function handleCreate(
+    title: string,
+    dueDate: string,
+    memo: string,
+    assigneeIds: number[],
+    branches: { branchName: string; repoName: string }[]
+  ) {
+    const body: { title: string; dueDate?: string; memo?: string; assigneeIds?: number[] } = { title }
     if (dueDate) body.dueDate = dueDate
     if (memo.trim()) body.memo = memo.trim()
-    await createCardApi(pid, body)
+    if (assigneeIds.length > 0) body.assigneeIds = assigneeIds
+    const res = await createCardApi(pid, body)
+    const cardId = res.data.data.id
+    if (branches.length > 0) {
+      await Promise.all(branches.map(b => addBranchApi(pid, cardId, b)))
+    }
     loadBoard()
   }
 
@@ -490,7 +640,7 @@ export default function BoardPage() {
       </div>
 
       <div className="board-cols-wrap">
-        <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+        <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
           <div className="board-cols">
             <DroppableColumn
               status="BACKLOG"
@@ -517,11 +667,31 @@ export default function BoardPage() {
               onCardClick={setSelectedCard}
             />
           </div>
+          <DragOverlay>
+            {activeCard && (
+              <div className={`kanban-card${activeCard.status === 'DONE' ? ' done-card' : ''}`} style={{ boxShadow: '0 8px 24px rgba(0,0,0,0.35)', opacity: 0.95 }}>
+                <div className="card-header">
+                  <div className="card-title-text">{activeCard.title}</div>
+                </div>
+                <div className="card-footer">
+                  <div className="card-assignees">
+                    {activeCard.assignees.slice(0, 3).map(a => (
+                      <div key={a.userId} className="mini-avatar" style={{ background: avatarColor(a.userId) }} title={a.name}>
+                        {a.name[0]}
+                      </div>
+                    ))}
+                  </div>
+                  {activeCard.dueDate && <span className="card-date">{formatDate(activeCard.dueDate)}</span>}
+                </div>
+              </div>
+            )}
+          </DragOverlay>
         </DndContext>
       </div>
 
       {showCreate && (
         <CreateCardModal
+          projectId={pid}
           onClose={() => setShowCreate(false)}
           onCreate={handleCreate}
         />

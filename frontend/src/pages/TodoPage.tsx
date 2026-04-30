@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { useOutletContext } from 'react-router-dom'
 import { getTodosApi, createTodoApi, toggleTodoApi, deleteTodoApi } from '@/api/todo'
 
 interface Todo {
@@ -8,32 +9,18 @@ interface Todo {
   createdAt: string
 }
 
-type Tab = '전체' | '오늘' | '이번 주' | '완료됨'
+type Tab = '전체' | '미완료' | '완료'
 
-const TABS: Tab[] = ['전체', '오늘', '이번 주', '완료됨']
-
-function isToday(dateStr: string) {
-  const d = new Date(dateStr)
-  const now = new Date()
-  return d.getFullYear() === now.getFullYear() &&
-    d.getMonth() === now.getMonth() &&
-    d.getDate() === now.getDate()
-}
-
-function isThisWeek(dateStr: string) {
-  const d = new Date(dateStr)
-  const now = new Date()
-  const startOfWeek = new Date(now)
-  startOfWeek.setDate(now.getDate() - now.getDay())
-  startOfWeek.setHours(0, 0, 0, 0)
-  return d >= startOfWeek
-}
+const TABS: Tab[] = ['전체', '미완료', '완료']
 
 function formatDate(dateStr: string): string {
   const d = new Date(dateStr)
   const now = new Date()
   const diff = now.getTime() - d.getTime()
-  if (diff < 86400000 && isToday(dateStr)) return '오늘'
+  const today = d.getFullYear() === now.getFullYear() &&
+    d.getMonth() === now.getMonth() &&
+    d.getDate() === now.getDate()
+  if (diff < 86400000 && today) return '오늘'
   const mm = String(d.getMonth() + 1).padStart(2, '0')
   const dd = String(d.getDate()).padStart(2, '0')
   return `${mm}/${dd}`
@@ -51,7 +38,14 @@ const PlusIcon = () => (
   </svg>
 )
 
+const TrashIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+    <path d="M6.5 1.75a.25.25 0 01.25-.25h2.5a.25.25 0 01.25.25V3h-3V1.75zm4.5 0V3h2.25a.75.75 0 010 1.5H2.75a.75.75 0 010-1.5H5V1.75C5 .784 5.784 0 6.75 0h2.5C10.216 0 11 .784 11 1.75zM4.496 6.675l.66 6.6a.25.25 0 00.249.225h5.19a.25.25 0 00.249-.225l.66-6.6a.75.75 0 011.492.149l-.66 6.6A1.748 1.748 0 0110.595 15H5.405a1.748 1.748 0 01-1.741-1.576l-.66-6.6a.75.75 0 111.492-.149z" />
+  </svg>
+)
+
 export default function TodoPage() {
+  const { setUndoneTodoCount } = useOutletContext<{ setUndoneTodoCount: (n: number) => void }>()
   const [todos, setTodos] = useState<Todo[]>([])
   const [tab, setTab] = useState<Tab>('전체')
   const [inputText, setInputText] = useState('')
@@ -68,11 +62,9 @@ export default function TodoPage() {
 
   function filterTodos(list: Todo[]): Todo[] {
     switch (tab) {
-      case '오늘':
-        return list.filter(t => !t.isDone && isToday(t.createdAt))
-      case '이번 주':
-        return list.filter(t => !t.isDone && isThisWeek(t.createdAt))
-      case '완료됨':
+      case '미완료':
+        return list.filter(t => !t.isDone)
+      case '완료':
         return list.filter(t => t.isDone)
       default:
         return list
@@ -85,7 +77,11 @@ export default function TodoPage() {
     setInputText('')
     try {
       const res = await createTodoApi(text)
-      setTodos(prev => [res.data.data, ...prev])
+      setTodos(prev => {
+        const next = [res.data.data, ...prev]
+        setUndoneTodoCount(next.filter(t => !t.isDone).length)
+        return next
+      })
     } catch {
       setInputText(text)
     }
@@ -94,23 +90,34 @@ export default function TodoPage() {
   async function handleToggle(id: number) {
     try {
       const res = await toggleTodoApi(id)
-      setTodos(prev => prev.map(t => t.id === id ? res.data.data : t))
+      setTodos(prev => {
+        const next = prev.map(t => t.id === id ? res.data.data : t)
+        setUndoneTodoCount(next.filter(t => !t.isDone).length)
+        return next
+      })
     } catch {
       /* ignore */
     }
   }
 
   async function handleDelete(id: number) {
-    setTodos(prev => prev.filter(t => t.id !== id))
+    setTodos(prev => {
+      const next = prev.filter(t => t.id !== id)
+      setUndoneTodoCount(next.filter(t => !t.isDone).length)
+      return next
+    })
     try {
       await deleteTodoApi(id)
     } catch {
-      getTodosApi().then(res => setTodos(res.data.data)).catch(() => {})
+      getTodosApi().then(res => {
+        setTodos(res.data.data)
+        setUndoneTodoCount((res.data.data as Todo[]).filter(t => !t.isDone).length)
+      }).catch(() => {})
     }
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === 'Enter') handleAdd()
+    if (e.key === 'Enter' && !e.nativeEvent.isComposing) handleAdd()
     if (e.key === 'Escape') {
       setInputText('')
       setFocused(false)
@@ -187,7 +194,7 @@ export default function TodoPage() {
             {todo.isDone ? '완료' : formatDate(todo.createdAt)}
           </span>
           <button className="todo-more" onClick={() => handleDelete(todo.id)}>
-            ⋯
+            <TrashIcon />
           </button>
         </div>
       ))}

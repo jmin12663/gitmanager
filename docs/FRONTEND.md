@@ -79,14 +79,14 @@ frontend/src/
 │   ├── AppLayout.tsx      # 사이드바 + topbar + <Outlet /> 레이아웃
 │   └── ui/                # shadcn/ui 자동 생성 컴포넌트
 ├── pages/
-│   ├── LoginPage.tsx      # ✅ 완료
-│   ├── RegisterPage.tsx   # ✅ 완료
-│   ├── VerifyPage.tsx     # ✅ 완료 (6자리 OTP)
-│   ├── TodoPage.tsx       # ✅ 완료
-│   ├── BoardPage.tsx      # 🔲 stub
-│   ├── CalendarPage.tsx   # 🔲 stub
-│   ├── DashboardPage.tsx  # 🔲 stub
-│   └── SettingsPage.tsx   # 🔲 stub
+│   ├── LoginPage.tsx      
+│   ├── RegisterPage.tsx   
+│   ├── VerifyPage.tsx     
+│   ├── TodoPage.tsx       
+│   ├── BoardPage.tsx      
+│   ├── CalendarPage.tsx   
+│   ├── DashboardPage.tsx  
+│   └── SettingsPage.tsx   
 ├── store/
 │   ├── authStore.ts       # AuthContext 타입 + useAuth 훅
 │   └── AuthProvider.tsx   # 앱 시작 시 RT 쿠키로 세션 복구
@@ -162,8 +162,6 @@ frontend/src/
 - 신규 CSS 클래스는 반드시 `src/index.css`에 `--gm-*` 변수를 사용해 추가
 
 ---
-
-## 미구현 페이지 구현 시 참고
 
 ### BoardPage (기능 4)
 - 백엔드 API: `GET /api/projects/:id/cards`, `POST /api/projects/:id/cards`, `PATCH /api/cards/:id`, `DELETE /api/cards/:id`

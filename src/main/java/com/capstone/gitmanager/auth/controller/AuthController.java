@@ -1,10 +1,14 @@
 package com.capstone.gitmanager.auth.controller;
 
+import com.capstone.gitmanager.auth.dto.ChangePasswordRequest;
 import com.capstone.gitmanager.auth.dto.EmailVerifyRequest;
 import com.capstone.gitmanager.auth.dto.LoginRequest;
 import com.capstone.gitmanager.auth.dto.LoginResponse;
 import com.capstone.gitmanager.auth.dto.RegisterRequest;
+import com.capstone.gitmanager.auth.dto.SendEmailCodeRequest;
 import com.capstone.gitmanager.auth.dto.TokenRefreshResponse;
+import com.capstone.gitmanager.auth.dto.UpdateLoginIdRequest;
+import com.capstone.gitmanager.auth.dto.UpdateProfileRequest;
 import com.capstone.gitmanager.auth.dto.UserResponse;
 import com.capstone.gitmanager.auth.service.AuthService;
 import com.capstone.gitmanager.common.dto.ApiResponse;
@@ -25,6 +29,18 @@ import java.util.Map;
 public class AuthController {
 
     private final AuthService authService;
+
+    @PostMapping("/send-email-code")
+    public ApiResponse<Void> sendEmailCode(@Valid @RequestBody SendEmailCodeRequest request) {
+        authService.sendEmailCode(request);
+        return ApiResponse.ok();
+    }
+
+    @PostMapping("/verify-email-code")
+    public ApiResponse<Void> verifyEmailCode(@Valid @RequestBody EmailVerifyRequest request) {
+        authService.verifyEmailCode(request);
+        return ApiResponse.ok();
+    }
 
     @PostMapping("/register")
     public ApiResponse<Void> register(@Valid @RequestBody RegisterRequest request) {
@@ -66,5 +82,30 @@ public class AuthController {
     @GetMapping("/me")
     public ApiResponse<UserResponse> getMe(@AuthenticationPrincipal Long userId) {
         return ApiResponse.ok(authService.getMe(userId));
+    }
+
+    @PatchMapping("/me")
+    public ApiResponse<UserResponse> updateProfile(@AuthenticationPrincipal Long userId,
+                                                   @Valid @RequestBody UpdateProfileRequest request) {
+        return ApiResponse.ok(authService.updateProfile(userId, request));
+    }
+
+    @GetMapping("/check-login-id")
+    public ApiResponse<Void> checkLoginId(@RequestParam String loginId) {
+        authService.checkLoginId(loginId);
+        return ApiResponse.ok();
+    }
+
+    @PatchMapping("/login-id")
+    public ApiResponse<UserResponse> updateLoginId(@AuthenticationPrincipal Long userId,
+                                                   @Valid @RequestBody UpdateLoginIdRequest request) {
+        return ApiResponse.ok(authService.updateLoginId(userId, request));
+    }
+
+    @PatchMapping("/password")
+    public ApiResponse<Void> changePassword(@AuthenticationPrincipal Long userId,
+                                            @Valid @RequestBody ChangePasswordRequest request) {
+        authService.changePassword(userId, request);
+        return ApiResponse.ok();
     }
 }

@@ -9,6 +9,7 @@ import CalendarPage from '@/pages/CalendarPage'
 import DashboardPage from '@/pages/DashboardPage'
 import SettingsPage from '@/pages/SettingsPage'
 import TodoPage from '@/pages/TodoPage'
+import ProfilePage from '@/pages/ProfilePage'
 
 export default function App() {
   return (
@@ -23,6 +24,7 @@ export default function App() {
           {/* App pages (with sidebar layout) */}
           <Route element={<AppLayout />}>
             <Route path="/todo" element={<TodoPage />} />
+            <Route path="/profile" element={<ProfilePage />} />
             <Route path="/projects/:projectId/board" element={<BoardPage />} />
             <Route path="/projects/:projectId/calendar" element={<CalendarPage />} />
             <Route path="/projects/:projectId/dashboard" element={<DashboardPage />} />

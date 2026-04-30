@@ -18,7 +18,7 @@ export default function VerifyPage() {
   const [digits, setDigits] = useState<string[]>(Array(OTP_LENGTH).fill(''))
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const [countdown, setCountdown] = useState(59)
+  const [countdown, setCountdown] = useState(300)
   const inputRefs = useRef<(HTMLInputElement | null)[]>([])
 
   useEffect(() => {
@@ -113,8 +113,8 @@ export default function VerifyPage() {
           <div className="resend-row">
             코드를 받지 못하셨나요?{' '}
             {countdown > 0
-              ? <span style={{ cursor: 'default' }}>재전송 ({countdown}s)</span>
-              : <span onClick={() => setCountdown(59)}>재전송</span>
+              ? <span style={{ cursor: 'default' }}>재전송 ({String(Math.floor(countdown / 60)).padStart(2, '0')}:{String(countdown % 60).padStart(2, '0')})</span>
+              : <span onClick={() => setCountdown(300)}>재전송</span>
             }
           </div>
 

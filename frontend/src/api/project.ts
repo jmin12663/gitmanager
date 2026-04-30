@@ -12,3 +12,6 @@ export const createProjectApi = (data: {
 
 export const joinProjectApi = (inviteCode: string) =>
   client.post('/projects/join', { inviteCode })
+
+export const getProjectMembersApi = (projectId: number) =>
+  client.get(`/projects/${projectId}/members`)

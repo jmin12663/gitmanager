@@ -26,3 +26,6 @@ export const createCommentApi = (projectId: number, cardId: number, content: str
 
 export const deleteCommentApi = (projectId: number, cardId: number, commentId: number) =>
   client.delete(`/projects/${projectId}/cards/${cardId}/comments/${commentId}`)
+
+export const addBranchApi = (projectId: number, cardId: number, body: { branchName: string; repoName: string }) =>
+  client.post(`/projects/${projectId}/cards/${cardId}/branches`, body)

@@ -44,4 +44,16 @@ public class User extends BaseEntity {
     public void verifyEmail() {
         this.emailVerified = true;
     }
+
+    public void updateName(String name) {
+        this.name = name;
+    }
+
+    public void updateLoginId(String loginId) {
+        this.loginId = loginId;
+    }
+
+    public void changePassword(String encodedPassword) {
+        this.password = encodedPassword;
+    }
 }

@@ -1,22 +1,33 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams } from 'react-router-dom'
+import FullCalendar from '@fullcalendar/react'
+import dayGridPlugin from '@fullcalendar/daygrid'
+import interactionPlugin from '@fullcalendar/interaction'
+import type { EventInput, EventClickArg, DatesSetArg } from '@fullcalendar/core'
+import type { DateClickArg } from '@fullcalendar/interaction'
 import type { Schedule } from '@/types/calendar'
-import { getSchedulesApi, createScheduleApi, deleteScheduleApi } from '@/api/calendar'
+import { getSchedulesApi, createScheduleApi, updateScheduleApi, deleteScheduleApi } from '@/api/calendar'
 
 const MONTHS = ['1월', '2월', '3월', '4월', '5월', '6월', '7월', '8월', '9월', '10월', '11월', '12월']
-const DOWS = ['일', '월', '화', '수', '목', '금', '토']
-const EVENT_CLASSES = ['ev-indigo', 'ev-green', 'ev-amber']
+const FC_COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#3b82f6']
 
-function getEventClass(id: number): string {
-  return EVENT_CLASSES[id % EVENT_CLASSES.length]
+function addOneDay(dateStr: string): string {
+  const d = new Date(dateStr + 'T00:00:00')
+  d.setDate(d.getDate() + 1)
+  return d.toISOString().slice(0, 10)
 }
 
-function toDateStr(y: number, m: number, d: number): string {
-  return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`
-}
-
-function getSchedulesForDay(schedules: Schedule[], dateStr: string): Schedule[] {
-  return schedules.filter(s => s.startDate <= dateStr && dateStr <= s.endDate)
+function scheduleToEvent(s: Schedule): EventInput {
+  return {
+    id: String(s.id),
+    title: s.title,
+    start: s.startDate,
+    end: addOneDay(s.endDate),
+    allDay: true,
+    backgroundColor: FC_COLORS[s.id % FC_COLORS.length],
+    borderColor: FC_COLORS[s.id % FC_COLORS.length],
+    extendedProps: { startDate: s.startDate, endDate: s.endDate },
+  }
 }
 
 const PlusIcon = () => (
@@ -88,60 +99,178 @@ function CreateScheduleModal({ defaultDate = '', onClose, onCreate }: CreateSche
   )
 }
 
+interface EditScheduleModalProps {
+  id: number
+  initialTitle: string
+  initialStartDate: string
+  initialEndDate: string
+  onClose: () => void
+  onSave: (id: number, title: string, startDate: string, endDate: string) => Promise<void>
+  onDelete: (id: number) => Promise<void>
+}
+
+function EditScheduleModal({ id, initialTitle, initialStartDate, initialEndDate, onClose, onSave, onDelete }: EditScheduleModalProps) {
+  const [title, setTitle] = useState(initialTitle)
+  const [startDate, setStartDate] = useState(initialStartDate)
+  const [endDate, setEndDate] = useState(initialEndDate)
+  const [saveLoading, setSaveLoading] = useState(false)
+  const [deleteLoading, setDeleteLoading] = useState(false)
+  const [error, setError] = useState('')
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!title.trim()) { setError('제목을 입력하세요.'); return }
+    if (startDate > endDate) { setError('종료일은 시작일 이후여야 합니다.'); return }
+    setSaveLoading(true)
+    try {
+      await onSave(id, title.trim(), startDate, endDate)
+      onClose()
+    } catch {
+      setError('일정 수정에 실패했습니다.')
+    } finally {
+      setSaveLoading(false)
+    }
+  }
+
+  async function handleDelete() {
+    if (!confirm('일정을 삭제하시겠습니까?')) return
+    setDeleteLoading(true)
+    try {
+      await onDelete(id)
+      onClose()
+    } catch {
+      setError('일정 삭제에 실패했습니다.')
+    } finally {
+      setDeleteLoading(false)
+    }
+  }
+
+  return (
+    <div className="gm-modal-overlay" onClick={onClose}>
+      <div className="gm-modal" onClick={e => e.stopPropagation()}>
+        <button className="gm-modal-close" onClick={onClose}>×</button>
+        <div className="gm-modal-title">일정 수정</div>
+        <form onSubmit={handleSubmit}>
+          <div className="auth-field">
+            <label>제목</label>
+            <input
+              type="text"
+              value={title}
+              onChange={e => setTitle(e.target.value)}
+              autoFocus
+            />
+          </div>
+          <div className="auth-field">
+            <label>시작일</label>
+            <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} />
+          </div>
+          <div className="auth-field">
+            <label>종료일</label>
+            <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} />
+          </div>
+          {error && <div className="auth-error">{error}</div>}
+          <div style={{ display: 'flex', gap: 8, marginTop: 4, alignItems: 'stretch' }}>
+            <button className="auth-btn-primary" type="submit" disabled={saveLoading} style={{ flex: 1, margin: 0 }}>
+              {saveLoading ? '저장 중...' : '저장'}
+            </button>
+            <button
+              className="auth-btn-secondary"
+              type="button"
+              onClick={handleDelete}
+              disabled={deleteLoading}
+              style={{ color: 'var(--gm-danger, #ef4444)', margin: 0 }}
+            >
+              {deleteLoading ? '삭제 중...' : '삭제'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
 export default function CalendarPage() {
   const { projectId } = useParams<{ projectId: string }>()
   const pid = Number(projectId)
 
+  const calendarRef = useRef<FullCalendar>(null)
   const today = new Date()
   const [year, setYear] = useState(today.getFullYear())
   const [month, setMonth] = useState(today.getMonth() + 1)
-  const [schedules, setSchedules] = useState<Schedule[]>([])
+  const [events, setEvents] = useState<EventInput[]>([])
   const [showCreate, setShowCreate] = useState(false)
   const [clickedDate, setClickedDate] = useState<string | undefined>(undefined)
-
-  // Date picker state
+  const [editTarget, setEditTarget] = useState<{ id: number; title: string; startDate: string; endDate: string } | null>(null)
   const [pickerOpen, setPickerOpen] = useState(false)
-  const [dpYear, setDpYear] = useState(year)
+  const [dpYear, setDpYear] = useState(today.getFullYear())
   const pickerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    loadSchedules()
-  }, [pid, year, month])
-
-  useEffect(() => {
+    if (!pickerOpen) return
     function handleClickOutside(e: MouseEvent) {
       if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) {
         setPickerOpen(false)
       }
     }
-    if (pickerOpen) {
-      document.addEventListener('mousedown', handleClickOutside)
-    }
+    document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [pickerOpen])
 
-  function loadSchedules() {
-    const from = toDateStr(year, month, 1)
-    const lastDay = new Date(year, month, 0).getDate()
-    const to = toDateStr(year, month, lastDay)
-    getSchedulesApi(pid, from, to)
-      .then(res => setSchedules(res.data.data))
-      .catch(() => setSchedules([]))
+  async function loadSchedules(from: string, to: string) {
+    try {
+      const res = await getSchedulesApi(pid, from, to)
+      setEvents((res.data.data as Schedule[]).map(scheduleToEvent))
+    } catch {
+      setEvents([])
+    }
   }
 
-  function prevMonth() {
-    if (month === 1) { setYear(y => y - 1); setMonth(12) }
-    else setMonth(m => m - 1)
+  function handleDatesSet(arg: DatesSetArg) {
+    const mid = new Date((arg.start.getTime() + arg.end.getTime()) / 2)
+    setYear(mid.getFullYear())
+    setMonth(mid.getMonth() + 1)
+    loadSchedules(arg.startStr.slice(0, 10), arg.endStr.slice(0, 10))
   }
 
-  function nextMonth() {
-    if (month === 12) { setYear(y => y + 1); setMonth(1) }
-    else setMonth(m => m + 1)
+  function handleDateClick(arg: DateClickArg) {
+    setClickedDate(arg.dateStr)
+    setShowCreate(true)
   }
 
-  function goToday() {
-    setYear(today.getFullYear())
-    setMonth(today.getMonth() + 1)
+  function handleEventClick(arg: EventClickArg) {
+    setEditTarget({
+      id: Number(arg.event.id),
+      title: arg.event.title,
+      startDate: arg.event.extendedProps.startDate as string,
+      endDate: arg.event.extendedProps.endDate as string,
+    })
+  }
+
+  async function handleUpdate(id: number, title: string, startDate: string, endDate: string) {
+    await updateScheduleApi(pid, id, { title, startDate, endDate })
+    const api = calendarRef.current?.getApi()
+    if (api) {
+      loadSchedules(
+        api.view.activeStart.toISOString().slice(0, 10),
+        api.view.activeEnd.toISOString().slice(0, 10),
+      )
+    }
+  }
+
+  async function handleDelete(id: number) {
+    await deleteScheduleApi(pid, id)
+    setEvents(prev => prev.filter(e => e.id !== String(id)))
+  }
+
+  async function handleCreate(title: string, startDate: string, endDate: string) {
+    await createScheduleApi(pid, { title, startDate, endDate })
+    const api = calendarRef.current?.getApi()
+    if (api) {
+      loadSchedules(
+        api.view.activeStart.toISOString().slice(0, 10),
+        api.view.activeEnd.toISOString().slice(0, 10),
+      )
+    }
   }
 
   function togglePicker() {
@@ -153,104 +282,67 @@ export default function CalendarPage() {
     setYear(y)
     setMonth(m)
     setPickerOpen(false)
-  }
-
-  async function handleCreate(title: string, startDate: string, endDate: string) {
-    await createScheduleApi(pid, { title, startDate, endDate })
-    loadSchedules()
-  }
-
-  async function handleDelete(id: number) {
-    if (!confirm('일정을 삭제하시겠습니까?')) return
-    try {
-      await deleteScheduleApi(pid, id)
-      setSchedules(prev => prev.filter(s => s.id !== id))
-    } catch {}
-  }
-
-  // Build calendar cells
-  const firstDay = new Date(year, month - 1, 1).getDay()
-  const daysInMonth = new Date(year, month, 0).getDate()
-  const daysInPrev = new Date(year, month - 1, 0).getDate()
-  const total = firstDay + daysInMonth
-  const trailing = total % 7 === 0 ? 0 : 7 - (total % 7)
-
-  interface CalCell {
-    day: number
-    dateStr: string
-    isCurrentMonth: boolean
-    isToday: boolean
-  }
-
-  const cells: CalCell[] = []
-
-  for (let i = firstDay - 1; i >= 0; i--) {
-    const d = daysInPrev - i
-    const prevMonth = month === 1 ? 12 : month - 1
-    const prevYear = month === 1 ? year - 1 : year
-    cells.push({ day: d, dateStr: toDateStr(prevYear, prevMonth, d), isCurrentMonth: false, isToday: false })
-  }
-  for (let d = 1; d <= daysInMonth; d++) {
-    const dateStr = toDateStr(year, month, d)
-    const isToday =
-      today.getFullYear() === year &&
-      today.getMonth() + 1 === month &&
-      today.getDate() === d
-    cells.push({ day: d, dateStr, isCurrentMonth: true, isToday })
-  }
-  for (let d = 1; d <= trailing; d++) {
-    const nextM = month === 12 ? 1 : month + 1
-    const nextY = month === 12 ? year + 1 : year
-    cells.push({ day: d, dateStr: toDateStr(nextY, nextM, d), isCurrentMonth: false, isToday: false })
+    calendarRef.current?.getApi().gotoDate(`${y}-${String(m).padStart(2, '0')}-01`)
   }
 
   return (
     <div>
       <div className="cal-toolbar">
-        <div style={{ position: 'relative' }} ref={pickerRef}>
-          <button className="cal-title-btn" onClick={togglePicker}>
-            <span className="cal-title-text">{year}년 {MONTHS[month - 1]}</span>
-            <svg
-              width="14" height="14" viewBox="0 0 16 16" fill="currentColor"
-              className="cal-title-chevron"
-              style={{ transform: pickerOpen ? 'rotate(180deg)' : 'rotate(0deg)', color: 'var(--gm-text3)' }}
-            >
-              <path d="M4.5 6.5l3.5 3.5 3.5-3.5" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+        {/* 왼쪽: ‹ 2026년 5월 › */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <button className="cal-arrow-btn" onClick={() => calendarRef.current?.getApi().prev()}>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path d="M10 12L6 8l4-4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </button>
 
-          {pickerOpen && (
-            <div className="date-picker-popup">
-              <div className="dp-year-nav">
-                <button className="dp-year-btn" onClick={() => setDpYear(y => y - 1)}>‹</button>
-                <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--gm-text1)' }}>{dpYear}년</span>
-                <button className="dp-year-btn" onClick={() => setDpYear(y => y + 1)}>›</button>
+          <div style={{ position: 'relative' }} ref={pickerRef}>
+            <button className="cal-title-btn" onClick={togglePicker} style={{ padding: '0 6px' }}>
+              <span className="cal-title-text">{year}년 {MONTHS[month - 1]}</span>
+              <svg
+                width="12" height="12" viewBox="0 0 16 16" fill="currentColor"
+                style={{ transform: pickerOpen ? 'rotate(180deg)' : 'rotate(0deg)', color: 'var(--gm-text3)', transition: 'transform 0.15s' }}
+              >
+                <path d="M4.5 6.5l3.5 3.5 3.5-3.5" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+
+            {pickerOpen && (
+              <div className="date-picker-popup">
+                <div className="dp-year-nav">
+                  <button className="dp-year-btn" onClick={() => setDpYear(y => y - 1)}>‹</button>
+                  <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--gm-text1)' }}>{dpYear}년</span>
+                  <button className="dp-year-btn" onClick={() => setDpYear(y => y + 1)}>›</button>
+                </div>
+                <div className="dp-months">
+                  {MONTHS.map((m, i) => {
+                    const mo = i + 1
+                    const isActive = dpYear === year && mo === month
+                    return (
+                      <button
+                        key={mo}
+                        className={`dp-month-btn${isActive ? ' active' : ''}`}
+                        onClick={() => selectMonth(dpYear, mo)}
+                      >
+                        {m}
+                      </button>
+                    )
+                  })}
+                </div>
               </div>
-              <div className="dp-months">
-                {MONTHS.map((m, i) => {
-                  const mo = i + 1
-                  const isActive = dpYear === year && mo === month
-                  return (
-                    <button
-                      key={mo}
-                      className={`dp-month-btn${isActive ? ' active' : ''}`}
-                      onClick={() => selectMonth(dpYear, mo)}
-                    >
-                      {m}
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-          )}
+            )}
+          </div>
+
+          <button className="cal-arrow-btn" onClick={() => calendarRef.current?.getApi().next()}>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path d="M6 4l4 4-4 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
         </div>
 
+        {/* 오른쪽: 오늘 + 일정 추가 */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div className="cal-nav">
-            <button className="cal-nav-btn" onClick={prevMonth}>‹</button>
-            <button className="cal-nav-btn" onClick={goToday} style={{ width: 'auto', padding: '0 10px', fontSize: 12 }}>오늘</button>
-            <button className="cal-nav-btn" onClick={nextMonth}>›</button>
-          </div>
+          <button className="cal-nav-btn" onClick={() => calendarRef.current?.getApi().today()} style={{ padding: '0 12px', fontSize: 12 }}>오늘</button>
           <button className="topbar-btn accent" onClick={() => { setClickedDate(undefined); setShowCreate(true) }}>
             <PlusIcon />
             일정 추가
@@ -258,39 +350,22 @@ export default function CalendarPage() {
         </div>
       </div>
 
-      <div className="cal-grid-wrap">
-        <div className="cal-dow-row">
-          {DOWS.map(d => (
-            <div key={d} className="cal-dow-cell">{d}</div>
-          ))}
-        </div>
-        <div className="cal-cells">
-          {cells.map((cell, idx) => {
-            const daySchedules = getSchedulesForDay(schedules, cell.dateStr)
-            return (
-              <div
-                key={idx}
-                className={`cal-cell${cell.isToday ? ' is-today' : ''}`}
-                onClick={() => { if (cell.isCurrentMonth) { setClickedDate(cell.dateStr); setShowCreate(true) } }}
-                style={{ cursor: cell.isCurrentMonth ? 'pointer' : 'default' }}
-              >
-                <div className={`cal-day-num${cell.isToday ? ' today' : ''}${!cell.isCurrentMonth ? ' other-month' : ''}`}>
-                  {cell.day}
-                </div>
-                {daySchedules.map(s => (
-                  <div
-                    key={s.id}
-                    className={`cal-event-pill ${getEventClass(s.id)}`}
-                    onClick={e => { e.stopPropagation(); handleDelete(s.id) }}
-                    title={`${s.title} (클릭하여 삭제)`}
-                  >
-                    {s.title}
-                  </div>
-                ))}
-              </div>
-            )
-          })}
-        </div>
+      <div className="fc-gm-wrap">
+        <FullCalendar
+          ref={calendarRef}
+          plugins={[dayGridPlugin, interactionPlugin]}
+          initialView="dayGridMonth"
+          headerToolbar={false}
+          locale="ko"
+          events={events}
+          datesSet={handleDatesSet}
+          dateClick={handleDateClick}
+          eventClick={handleEventClick}
+          height="auto"
+          dayMaxEvents={3}
+          moreLinkText={n => `+${n}개 더`}
+          eventDisplay="block"
+        />
       </div>
 
       {showCreate && (
@@ -298,6 +373,18 @@ export default function CalendarPage() {
           defaultDate={clickedDate}
           onClose={() => setShowCreate(false)}
           onCreate={handleCreate}
+        />
+      )}
+
+      {editTarget && (
+        <EditScheduleModal
+          id={editTarget.id}
+          initialTitle={editTarget.title}
+          initialStartDate={editTarget.startDate}
+          initialEndDate={editTarget.endDate}
+          onClose={() => setEditTarget(null)}
+          onSave={handleUpdate}
+          onDelete={handleDelete}
         />
       )}
     </div>

@@ -186,14 +186,7 @@ POST /api/webhook/github 수신
 
 ### 이미지 업로드 (서버 중계 방식)
 > 미구현. 구현 시 CAPSTONE_PLAN.md 기능 4 참조.
-
-### Soft Delete 전략
-```
-카드, 댓글 삭제 시 is_deleted = true 처리
-JPA @SQLRestriction("is_deleted = false") 자동 필터링
-연결된 commit_logs, comment 보존
-```
-
+> 
 ---
 
 ## 5. 배포
@@ -214,10 +207,10 @@ JPA @SQLRestriction("is_deleted = false") 자동 필터링
 ---
 
 ## 7. 현재 구현 상태
-> 세부 체크리스트 → STATUS.md 참조. 아래는 기능 단위 완료 현황.
-
+> 세부 체크리스트 → STATUS.md 참조. 아래는 기능 단위 완료 현황. 
 ### 백엔드
 - [x] 기능 1: 회원 관리 + JWT (Access/Refresh Token, 이메일 인증)
+- [x] 기능 1 (추가): 아이디 중복 확인 (`GET /api/auth/check-login-id`), 아이디 변경 (`PATCH /api/auth/login-id`)
 - [x] 기능 2: 팀 프로젝트 관리 (초대 코드, 멤버 역할)
 - [x] 기능 3: 개인 ToDo
 - [x] 기능 4: Develop Board (카드 CRUD, 담당자, 댓글, Branch 연결)
@@ -230,11 +223,12 @@ JPA @SQLRestriction("is_deleted = false") 자동 필터링
 
 ### 프론트엔드
 - [x] 기능 1: 로그인 / 회원가입 / 이메일 인증 (OTP)
-- [x] 기능 2: 사이드바 + 팀 프로젝트 관리 (생성/참여)
-- [x] 기능 3: 개인 ToDo (탭 필터, 추가/토글/삭제)
+- [x] 기능 1 (추가): 개인정보 설정 페이지 — 이름 수정, 아이디 수정(중복 확인 → 저장), 비밀번호 변경, 로그아웃 팝오버, 다크/라이트 테마 토글
+- [x] 기능 2: 사이드바 + 팀 프로젝트 관리 (생성/참여), 미완료 할일 뱃지 실시간 반영
+- [x] 기능 3: 개인 ToDo — 탭 필터(전체/미완료/완료), 추가/토글/삭제
 - [x] 기능 4: Develop Board — 3컬럼 칸반, DnD 상태변경, 카드 생성·상세·삭제, 댓글 CRUD
-- [x] 기능 6: 캘린더 — 월별 그리드, 연/월 피커, 일정 추가·삭제
-- [x] 기능 7: 대시보드 — 메트릭 4개, 커밋 피드, SVG 도넛 차트, 멤버 바 차트
+- [x] 기능 6: 캘린더 — FullCalendar 전환(멀티데이 spanning), 연/월 피커, 일정 추가·수정·삭제
+- [x] 기능 7: 대시보드 — 메트릭 4개, 커밋 피드(항상 표시), SVG 도넛 차트, 멤버 바 차트
 - [x] 기능 8: 설정 — GitHub 연동, 초대코드, 멤버 관리(추방/탈퇴), 프로젝트 삭제
 - [ ] 배포
 

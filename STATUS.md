@@ -6,10 +6,12 @@
 
 - [x] 프로젝트 세팅 (Spring Boot 3.5.12, MySQL 연결)
 - [x] BaseEntity, ApiResponse, GlobalExceptionHandler 공통 클래스
-- [x] CORS 설정 (WebMvcConfigurer)
+- [x] CORS 설정 (CorsConfigurationSource 빈 등록 + SecurityConfig .cors() 위임 — Spring Security 필터 레벨에서 처리)
 - [x] 기능 1: 회원 관리 + JWT (1차: RT 저장/만료 검증)
   - [x] UX 개선: 로그인 시 이메일 미인증 계정 → `/verify?email=xxx`로 자동 리다이렉트 (loginId 입력 시에도 실제 이메일 자동 전달)
   - [x] `GET /api/auth/me` — 페이지 새로고침 후 세션 복구용 (userId, loginId, name, email 반환)
+  - [x] `GET /api/auth/check-login-id` — 아이디 중복 확인 (인증 필요)
+  - [x] `PATCH /api/auth/login-id` — 아이디 변경 (중복 확인 후 저장)
 - [x] 기능 2: 팀 프로젝트 관리 (초대 코드 방식)
 - [x] 기능 3: 개인 ToDo
 - [x] 기능 4: Develop Board
@@ -42,12 +44,13 @@
 - [x] 기능 2: 사이드바 + 팀 프로젝트 관리
 - [x] 기능 3: 개인 ToDo 페이지
   - [x] 할일 목록 조회 / 추가(Enter) / 체크 토글 / 삭제
-  - [x] 탭 필터 (전체 / 오늘 / 이번 주 / 완료됨)
+  - [x] 탭 필터 (전체 / 미완료 / 완료)
   - 참고: 백엔드에 priority/dueDate 없음 → createdAt 기준 날짜 표시, priority pill 미구현
 - [x] 기능 4: Develop Board (칸반) — 3컬럼 칸반, DnD 상태변경, 카드 생성/상세/삭제, 댓글 CRUD
 - [x] 기능 6: 캘린더 페이지 — 월별 그리드, 연/월 피커, 일정 추가(날 클릭)/삭제
 - [x] 기능 7: 대시보드 페이지 — 메트릭 카드 4개, 최근 커밋 피드, 도넛 차트, 멤버 바 차트
 - [x] 기능 8: 프로젝트 설정 — GitHub 연동(등록/재설정), 초대코드(복사/재생성), 멤버 관리(목록/추방/탈퇴), 프로젝트 삭제
+- [x] 프로필 페이지 — 이름 수정, 아이디 수정(중복 확인 → 저장), 비밀번호 변경
 
 ### 공통 인프라 (완료)
 - [x] `src/index.css` — `--gm-*` 디자인 토큰 + auth/sidebar/topbar/todo CSS 전체

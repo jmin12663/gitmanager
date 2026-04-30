@@ -1,7 +1,12 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Outlet, useNavigate, useLocation, useParams, Link } from 'react-router-dom'
 import { useAuth } from '@/store/authStore'
 import { getMyProjectsApi, createProjectApi, joinProjectApi } from '@/api/project'
+import { getTodosApi } from '@/api/todo'
+import { getGithubConfigApi } from '@/api/settings'
+import { logoutApi } from '@/api/auth'
+import { setAccessToken } from '@/api/client'
+import { getTheme, toggleTheme, type Theme } from '@/lib/theme'
 import type { Project } from '@/types/project'
 
 const PROJ_COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#3b82f6']
@@ -21,7 +26,7 @@ const DashboardIcon = () => (
 )
 
 const BoardIcon = () => (
-  <svg viewBox="0 0 16 16" fill="currentColor"><path d="M1 2h4v12H1zm5 0h4v8H6zm5 0h4v5h-4z" /></svg>
+  <svg viewBox="0 0 16 16" fill="currentColor"><path d="M1 2h4v12H1zM6 2h4v12H6zM11 2h4v12H11z" /></svg>
 )
 
 const CalendarIcon = () => (
@@ -33,13 +38,7 @@ const CalendarIcon = () => (
 
 const SettingsIcon = () => (
   <svg viewBox="0 0 16 16" fill="currentColor">
-    <path d="M8 10a2 2 0 100-4 2 2 0 000 4zm5.67-1.86l.89-.51-.75-1.3-.89.51a4.07 4.07 0 00-.69-.4l-.11-1.02h-1.5l-.11 1.02a4.07 4.07 0 00-.69.4l-.89-.51-.75 1.3.89.51a4 4 0 000 .72l-.89.51.75 1.3.89-.51c.21.16.44.29.69.4l.11 1.02h1.5l.11-1.02c.25-.11.48-.24.69-.4l.89.51.75-1.3-.89-.51a4 4 0 000-.72z" />
-  </svg>
-)
-
-const BellIcon = () => (
-  <svg viewBox="0 0 16 16" fill="currentColor">
-    <path d="M8 16a2 2 0 001.985-1.75c.017-.137-.097-.25-.235-.25h-3.5c-.138 0-.252.113-.235.25A2 2 0 008 16zm.25-14.25a.75.75 0 00-1.5 0v.635a5.5 5.5 0 00-4.75 5.365V9.5l-1.5 2v.5h11v-.5l-1.5-2V7.75A5.5 5.5 0 008.25 2.385V1.75z" />
+    <path d="M9.405 1.05c-.413-1.4-2.397-1.4-2.81 0l-.1.34a1.464 1.464 0 01-2.105.872l-.31-.17c-1.283-.698-2.686.705-1.987 1.987l.169.311c.446.82.023 1.841-.872 2.105l-.34.1c-1.4.413-1.4 2.397 0 2.81l.34.1a1.464 1.464 0 01.872 2.105l-.17.31c-.698 1.283.705 2.686 1.987 1.987l.311-.169a1.464 1.464 0 012.105.872l.1.34c.413 1.4 2.397 1.4 2.81 0l.1-.34a1.464 1.464 0 012.105-.872l.31.17c1.283.698 2.686-.705 1.987-1.987l-.169-.311a1.464 1.464 0 01.872-2.105l.34-.1c1.4-.413 1.4-2.397 0-2.81l-.34-.1a1.464 1.464 0 01-.872-2.105l.17-.31c.698-1.283-.705-2.686-1.987-1.987l-.311.169a1.464 1.464 0 01-2.105-.872l-.1-.34zM8 10.93a2.929 2.929 0 110-5.86 2.929 2.929 0 010 5.858z" />
   </svg>
 )
 
@@ -54,6 +53,7 @@ const PAGE_LABELS: Record<string, string> = {
   dashboard: '대시보드',
   calendar: '캘린더',
   settings: '설정',
+  profile: '개인정보 설정',
 }
 
 function currentPage(pathname: string): string {
@@ -62,6 +62,7 @@ function currentPage(pathname: string): string {
   if (pathname.endsWith('/calendar')) return 'calendar'
   if (pathname.endsWith('/settings')) return 'settings'
   if (pathname === '/todo') return 'todo'
+  if (pathname === '/profile') return 'profile'
   return ''
 }
 
@@ -183,12 +184,17 @@ export default function AppLayout() {
   const navigate = useNavigate()
   const location = useLocation()
   const { projectId } = useParams<{ projectId?: string }>()
-  const { user, isLoading } = useAuth()
+  const { user, setUser, isLoading } = useAuth()
 
   const [projects, setProjects] = useState<Project[]>([])
   const [openProjectIds, setOpenProjectIds] = useState<Set<number>>(new Set())
   const [showCreate, setShowCreate] = useState(false)
   const [showJoin, setShowJoin] = useState(false)
+  const [githubConnected, setGithubConnected] = useState<boolean | null>(null)
+  const [showProfileMenu, setShowProfileMenu] = useState(false)
+  const profileMenuRef = useRef<HTMLDivElement>(null)
+  const [theme, setTheme] = useState<Theme>(getTheme)
+  const [undoneTodoCount, setUndoneTodoCount] = useState(0)
 
   const page = currentPage(location.pathname)
   const currentProjectId = projectId ? Number(projectId) : null
@@ -199,6 +205,16 @@ export default function AppLayout() {
       navigate('/login', { replace: true })
     }
   }, [isLoading, user, navigate])
+
+  useEffect(() => {
+    if (!user) return
+    getTodosApi()
+      .then(res => {
+        const todos = res.data.data as { isDone: boolean }[]
+        setUndoneTodoCount(todos.filter(t => !t.isDone).length)
+      })
+      .catch(() => {})
+  }, [user, location.pathname])
 
   useEffect(() => {
     if (!user) return
@@ -214,6 +230,42 @@ export default function AppLayout() {
       })
       .catch(() => {})
   }, [user, currentProjectId])
+
+  useEffect(() => {
+    if (!currentProjectId) {
+      setGithubConnected(null)
+      return
+    }
+    getGithubConfigApi(currentProjectId)
+      .then(() => setGithubConnected(true))
+      .catch(() => setGithubConnected(false))
+  }, [currentProjectId])
+
+  useEffect(() => {
+    if (!showProfileMenu) return
+    function handleClickOutside(e: MouseEvent) {
+      if (profileMenuRef.current && !profileMenuRef.current.contains(e.target as Node)) {
+        setShowProfileMenu(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [showProfileMenu])
+
+  function handleThemeToggle() {
+    setTheme(toggleTheme())
+  }
+
+  async function handleLogout() {
+    try {
+      await logoutApi()
+    } catch {
+      // 서버 오류여도 클라이언트 정리는 진행
+    }
+    setAccessToken(null)
+    setUser(null)
+    navigate('/login', { replace: true })
+  }
 
   function toggleProject(id: number) {
     setOpenProjectIds(prev => {
@@ -260,10 +312,6 @@ export default function AppLayout() {
             <GithubIcon />
           </div>
           <span className="logo-text">GitManager</span>
-          <button className="notif-btn">
-            <div className="notif-dot" />
-            <BellIcon />
-          </button>
         </div>
 
         <div className="sidebar-body">
@@ -274,6 +322,9 @@ export default function AppLayout() {
           >
             <TodoIcon />
             내 할일
+            {undoneTodoCount > 0 && (
+              <span className="nav-badge">{undoneTodoCount}</span>
+            )}
           </Link>
 
           <div className="nav-section-label">프로젝트</div>
@@ -342,13 +393,46 @@ export default function AppLayout() {
           </button>
         </div>
 
-        <div className="sidebar-footer">
-          <div className="user-avatar">{userInitial}</div>
-          <div className="user-info">
-            <div className="user-name">{user?.name}</div>
-            <div className="user-role">Developer</div>
-          </div>
-          <button className="theme-toggle" title="테마 전환">◐</button>
+        <div className="sidebar-footer" ref={profileMenuRef}>
+          {showProfileMenu && (
+            <div className="profile-popover">
+              <Link
+                to="/profile"
+                className="profile-popover-item"
+                onClick={() => setShowProfileMenu(false)}
+              >
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                  <path d="M8 8a3 3 0 100-6 3 3 0 000 6zm-5 6a5 5 0 0110 0H3z" />
+                </svg>
+                개인정보 설정
+              </Link>
+              <div className="profile-popover-divider" />
+              <button className="profile-popover-item profile-popover-logout" onClick={handleLogout}>
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                  <path d="M10 12.5a.5.5 0 01-.5.5h-8a.5.5 0 01-.5-.5v-9a.5.5 0 01.5-.5h8a.5.5 0 01.5.5v2a.5.5 0 001 0v-2A1.5 1.5 0 009.5 2h-8A1.5 1.5 0 000 3.5v9A1.5 1.5 0 001.5 14h8a1.5 1.5 0 001.5-1.5v-2a.5.5 0 00-1 0v2z" />
+                  <path d="M15.854 8.354a.5.5 0 000-.708l-3-3a.5.5 0 00-.708.708L14.293 7.5H5.5a.5.5 0 000 1h8.793l-2.147 2.146a.5.5 0 00.708.708l3-3z" />
+                </svg>
+                로그아웃
+              </button>
+            </div>
+          )}
+          <button
+            className="profile-trigger"
+            onClick={() => setShowProfileMenu(v => !v)}
+          >
+            <div className="user-avatar">{userInitial}</div>
+            <div className="user-info">
+              <div className="user-name">{user?.name}</div>
+              <div className="user-role">Developer</div>
+            </div>
+          </button>
+          <button
+            className="theme-toggle"
+            title={theme === 'dark' ? '라이트 모드로 전환' : '다크 모드로 전환'}
+            onClick={handleThemeToggle}
+          >
+            {theme === 'dark' ? '☀' : '◑'}
+          </button>
         </div>
       </div>
 
@@ -367,18 +451,25 @@ export default function AppLayout() {
             </div>
           </div>
           <div className="topbar-right">
-            {page !== 'settings' && (
-              <div className="gh-status">
-                <span className="gh-dot-live" />
-                GitHub 연동됨
-              </div>
+            {page !== 'settings' && githubConnected !== null && (
+              githubConnected ? (
+                <div className="gh-status">
+                  <span className="gh-dot-live" />
+                  GitHub 연동됨
+                </div>
+              ) : (
+                <div className="gh-status gh-status-disconnected">
+                  <span className="gh-dot-dead" />
+                  GitHub 연동 안됨
+                </div>
+              )
             )}
           </div>
         </div>
 
         <div className="page-container">
           <div className="gm-page">
-            <Outlet />
+            <Outlet context={{ setUndoneTodoCount }} />
           </div>
         </div>
       </div>

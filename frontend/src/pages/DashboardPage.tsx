@@ -156,35 +156,6 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {recentCommits.length > 0 && (
-        <div style={{ marginBottom: 14 }}>
-          <div className="dash-card">
-            <div className="dash-card-title">최근 커밋</div>
-            <div className="commit-feed">
-              {recentCommits.map((c, i) => (
-                <div key={`${c.commitSha}-${i}`} className="commit-row">
-                  <div className="commit-av" style={{ background: avatarColor(c.author.charCodeAt(0)) }}>
-                    {c.author ? c.author[0].toUpperCase() : '?'}
-                  </div>
-                  <div className="commit-body">
-                    <div className="commit-message">{c.message || '(메시지 없음)'}</div>
-                    <div className="commit-meta">
-                      {formatCommitTime(c.committedAt)}
-                      {c.commitSha && (
-                        <> · <span className="commit-sha">{c.commitSha.slice(0, 7)}</span></>
-                      )}
-                      {c.cardTitle && (
-                        <> · {c.cardTitle}</>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
       <div className="dash-row">
         <div className="dash-card">
           <div className="dash-card-title">카드 현황</div>
@@ -228,6 +199,39 @@ export default function DashboardPage() {
           ) : (
             <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--gm-text3)', fontSize: 13 }}>
               멤버 정보가 없습니다
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div style={{ marginBottom: 14 }}>
+        <div className="dash-card">
+          <div className="dash-card-title">최근 커밋</div>
+          {recentCommits.length > 0 ? (
+            <div className="commit-feed">
+              {recentCommits.map((c, i) => (
+                <div key={`${c.commitSha}-${i}`} className="commit-row">
+                  <div className="commit-av" style={{ background: avatarColor(c.author.charCodeAt(0)) }}>
+                    {c.author ? c.author[0].toUpperCase() : '?'}
+                  </div>
+                  <div className="commit-body">
+                    <div className="commit-message">{c.message || '(메시지 없음)'}</div>
+                    <div className="commit-meta">
+                      {formatCommitTime(c.committedAt)}
+                      {c.commitSha && (
+                        <> · <span className="commit-sha">{c.commitSha.slice(0, 7)}</span></>
+                      )}
+                      {c.cardTitle && (
+                        <> · {c.cardTitle}</>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--gm-text3)', fontSize: 13 }}>
+              커밋 내역이 없습니다
             </div>
           )}
         </div>
