@@ -38,11 +38,30 @@
 
 - [x] 프로젝트 세팅 (Vite + React + Tailwind v4 + shadcn/ui)
 - [x] 모노레포 구조 전환 (`gitmanager/frontend/`) + 빌드 outDir → `../src/main/resources/static`
-- [ ] 기능 1: 로그인 / 회원가입 / 이메일 인증 페이지
-- [ ] 기능 2: 사이드바 + 팀 프로젝트 관리
-- [ ] 기능 3: 개인 ToDo 페이지
-- [ ] 기능 4: Develop Board (칸반)
-- [ ] 기능 6: 캘린더 페이지
-- [ ] 기능 7: 대시보드 페이지
-- [ ] 기능 8: 프로젝트 설정 (GitHub 연동, 멤버 관리, 초대코드)
+- [x] 기능 1: 로그인 / 회원가입 / 이메일 인증 페이지
+- [x] 기능 2: 사이드바 + 팀 프로젝트 관리
+- [x] 기능 3: 개인 ToDo 페이지
+  - [x] 할일 목록 조회 / 추가(Enter) / 체크 토글 / 삭제
+  - [x] 탭 필터 (전체 / 오늘 / 이번 주 / 완료됨)
+  - 참고: 백엔드에 priority/dueDate 없음 → createdAt 기준 날짜 표시, priority pill 미구현
+- [x] 기능 4: Develop Board (칸반) — 3컬럼 칸반, DnD 상태변경, 카드 생성/상세/삭제, 댓글 CRUD
+- [x] 기능 6: 캘린더 페이지 — 월별 그리드, 연/월 피커, 일정 추가(날 클릭)/삭제
+- [x] 기능 7: 대시보드 페이지 — 메트릭 카드 4개, 최근 커밋 피드, 도넛 차트, 멤버 바 차트
+- [x] 기능 8: 프로젝트 설정 — GitHub 연동(등록/재설정), 초대코드(복사/재생성), 멤버 관리(목록/추방/탈퇴), 프로젝트 삭제
+
+### 공통 인프라 (완료)
+- [x] `src/index.css` — `--gm-*` 디자인 토큰 + auth/sidebar/topbar/todo CSS 전체
+- [x] `src/api/client.ts` — axios + Bearer 헤더 + 401 자동 refresh
+- [x] `src/api/auth.ts` — login / register / verifyEmail / getMe
+- [x] `src/api/project.ts` — getMyProjects / createProject / joinProject
+- [x] `src/api/todo.ts` — getTodos / createTodo / toggleTodo / deleteTodo
+- [x] `src/api/board.ts` — getBoard / createCard / getCard / updateCard / updateCardStatus / deleteCard / getComments / createComment / deleteComment
+- [x] `src/api/calendar.ts` — getSchedules / createSchedule / updateSchedule / deleteSchedule
+- [x] `src/api/dashboard.ts` — getDashboard
+- [x] `src/types/board.ts`, `calendar.ts`, `dashboard.ts` — 타입 정의
+- [x] `src/api/settings.ts` — getInviteCode / regenerateInviteCode / getMembers / kickMember / leaveProject / deleteProject / getGithubConfig / registerGithubConfig
+- [x] `src/components/AppLayout.tsx` — 사이드바 + topbar + Outlet (미인증 시 /login 리다이렉트)
+- [x] `src/store/` — AuthContext + AuthProvider (세션 복구)
+- [x] `src/types/project.ts` — Project, ProjectRole
+
 - [ ] 배포

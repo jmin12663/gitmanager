@@ -1,0 +1,1545 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GitManager — Team Collaboration Platform</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --sidebar-w: 240px;
+    --topbar-h: 52px;
+    --bg: #0f1117;
+    --bg2: #161b27;
+    --bg3: #1c2333;
+    --bg4: #222940;
+    --border: rgba(255,255,255,0.07);
+    --border2: rgba(255,255,255,0.12);
+    --text1: #f0f4ff;
+    --text2: #8b95b0;
+    --text3: #4e5870;
+    --accent: #6366f1;
+    --accent2: #818cf8;
+    --accent-bg: rgba(99,102,241,0.12);
+    --accent-bg2: rgba(99,102,241,0.22);
+    --green: #10b981;
+    --green-bg: rgba(16,185,129,0.12);
+    --amber: #f59e0b;
+    --amber-bg: rgba(245,158,11,0.12);
+    --red: #ef4444;
+    --red-bg: rgba(239,68,68,0.1);
+    --radius: 8px;
+    --radius-lg: 12px;
+    font-family: 'Geist', sans-serif;
+  }
+
+  html.light {
+    --bg: #f4f6fb;
+    --bg2: #ffffff;
+    --bg3: #eef0f6;
+    --bg4: #e2e6f0;
+    --border: rgba(0,0,0,0.07);
+    --border2: rgba(0,0,0,0.13);
+    --text1: #111827;
+    --text2: #4b5563;
+    --text3: #9ca3af;
+    --accent: #6366f1;
+    --accent2: #4f46e5;
+    --accent-bg: rgba(99,102,241,0.08);
+    --accent-bg2: rgba(99,102,241,0.14);
+    --green: #059669;
+    --green-bg: rgba(5,150,105,0.08);
+    --amber: #d97706;
+    --amber-bg: rgba(217,119,6,0.08);
+    --red: #dc2626;
+    --red-bg: rgba(220,38,38,0.07);
+  }
+
+  html.light body { background: var(--bg); color: var(--text1); }
+  html.light .topbar { background: #ffffff; border-color: rgba(0,0,0,0.07); }
+  html.light .main-area { background: var(--bg); }
+  html.light .kanban-card { background: #ffffff; }
+  html.light .board-col { background: #eef0f6; border-color: rgba(0,0,0,0.07); }
+  html.light .gh-status { background: rgba(5,150,105,0.06); border-color: rgba(5,150,105,0.25); }
+  html.light .filter-btn { background: #ffffff; }
+  html.light .commit-sha { background: rgba(99,102,241,0.08); color: #4f46e5; }
+  html.light .auth-card { background: #ffffff; border-color: rgba(0,0,0,0.1); }
+  html.light .auth-field input { background: #f4f6fb; border-color: rgba(0,0,0,0.12); color: #111827; }
+  html.light .btn-ghost { background: #eef0f6; border-color: rgba(0,0,0,0.12); color: #111827; }
+  html.light .btn-ghost:hover { background: #e2e6f0; }
+  html.light .otp-row input { background: #eef0f6; border-color: rgba(0,0,0,0.12); color: #111827; }
+  html.light .topbar-btn { background: #eef0f6; border-color: rgba(0,0,0,0.12); color: #4b5563; }
+  html.light .topbar-btn:hover { background: #e2e6f0; color: #111827; }
+  html.light .cal-grid-wrap { background: #ffffff; }
+  html.light .cal-dow-row { background: #eef0f6; }
+  html.light .webhook-url-box { background: #eef0f6; border-color: rgba(0,0,0,0.1); }
+  html.light .mono-text { background: #eef0f6; }
+  html.light .danger-zone { background: rgba(220,38,38,0.04); }
+  html.light .code-display { background: #eef0f6; border-color: rgba(0,0,0,0.1); }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text1);
+    font-family: 'Geist', sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    min-height: 100vh;
+    overflow: hidden;
+  }
+
+  /* ── AUTH PAGES ── */
+  .auth-wrap {
+    display: none;
+    min-height: 100vh;
+    background: var(--bg);
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+  }
+  .auth-wrap.active { display: flex; }
+
+  .auth-bg {
+    position: absolute; inset: 0; z-index: 0;
+    background:
+      radial-gradient(ellipse 60% 50% at 20% 50%, rgba(99,102,241,0.08) 0%, transparent 70%),
+      radial-gradient(ellipse 40% 60% at 80% 30%, rgba(129,140,248,0.05) 0%, transparent 60%);
+  }
+
+  .auth-grid {
+    position: absolute; inset: 0;
+    background-image: linear-gradient(var(--border) 1px, transparent 1px),
+      linear-gradient(90deg, var(--border) 1px, transparent 1px);
+    background-size: 48px 48px;
+    opacity: 0.4;
+  }
+
+  .auth-card {
+    position: relative; z-index: 1;
+    width: 420px;
+    background: var(--bg2);
+    border: 1px solid var(--border2);
+    border-radius: var(--radius-lg);
+    padding: 40px;
+  }
+
+  .auth-logo {
+    display: flex; align-items: center; gap: 10px;
+    margin-bottom: 32px;
+  }
+  .auth-logo-icon {
+    width: 36px; height: 36px;
+    background: var(--accent);
+    border-radius: 9px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .auth-logo-icon svg { width: 20px; height: 20px; fill: white; }
+  .auth-logo-name { font-size: 18px; font-weight: 600; color: var(--text1); }
+
+  .auth-title { font-size: 22px; font-weight: 600; color: var(--text1); margin-bottom: 6px; }
+  .auth-sub { font-size: 13px; color: var(--text2); margin-bottom: 28px; }
+
+  .auth-field { margin-bottom: 14px; }
+  .auth-field label { display: block; font-size: 12px; color: var(--text2); margin-bottom: 6px; font-weight: 500; letter-spacing: 0.03em; }
+  .auth-field input {
+    width: 100%; padding: 10px 14px;
+    background: var(--bg3); border: 1px solid var(--border2);
+    border-radius: var(--radius); color: var(--text1); font-size: 14px;
+    font-family: 'Geist', sans-serif;
+    outline: none; transition: border-color 0.15s;
+  }
+  .auth-field input:focus { border-color: var(--accent); }
+
+  .btn-primary {
+    width: 100%; padding: 11px;
+    background: var(--accent); color: white;
+    border: none; border-radius: var(--radius);
+    font-size: 14px; font-weight: 500; font-family: 'Geist', sans-serif;
+    cursor: pointer; transition: opacity 0.15s, transform 0.1s;
+    margin-top: 6px;
+  }
+  .btn-primary:hover { opacity: 0.88; }
+  .btn-primary:active { transform: scale(0.99); }
+
+  .btn-ghost {
+    width: 100%; padding: 10px;
+    background: var(--bg3); color: var(--text1);
+    border: 1px solid var(--border2); border-radius: var(--radius);
+    font-size: 14px; font-weight: 400; font-family: 'Geist', sans-serif;
+    cursor: pointer; transition: background 0.15s;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    margin-bottom: 10px;
+  }
+  .btn-ghost:hover { background: var(--bg4); }
+  .btn-ghost svg { width: 16px; height: 16px; fill: var(--text1); }
+
+  .auth-divider {
+    display: flex; align-items: center; gap: 12px;
+    margin: 16px 0; color: var(--text3); font-size: 12px;
+  }
+  .auth-divider::before, .auth-divider::after {
+    content: ''; flex: 1; height: 1px; background: var(--border2);
+  }
+
+  .auth-link { text-align: center; margin-top: 20px; font-size: 13px; color: var(--text2); }
+  .auth-link a { color: var(--accent2); cursor: pointer; text-decoration: none; }
+  .auth-link a:hover { text-decoration: underline; }
+
+  .otp-row { display: flex; gap: 8px; margin-bottom: 20px; }
+  .otp-row input {
+    flex: 1; text-align: center; font-size: 22px; font-weight: 600;
+    font-family: 'Geist Mono', monospace;
+    padding: 12px 0;
+    background: var(--bg3); border: 1px solid var(--border2);
+    border-radius: var(--radius); color: var(--text1); outline: none;
+  }
+  .otp-row input:focus { border-color: var(--accent); }
+  .resend-row { text-align: center; font-size: 12px; color: var(--text2); margin-bottom: 16px; }
+  .resend-row span { color: var(--accent2); cursor: pointer; }
+
+  /* ── APP LAYOUT ── */
+  .app-wrap {
+    display: none;
+    height: 100vh;
+    overflow: hidden;
+  }
+  .app-wrap.active { display: flex; }
+
+  /* ── SIDEBAR ── */
+  .sidebar {
+    width: var(--sidebar-w);
+    min-width: var(--sidebar-w);
+    height: 100vh;
+    background: var(--bg2);
+    border-right: 1px solid var(--border);
+    display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+
+  .sidebar-header {
+    padding: 18px 16px 14px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .logo-mark {
+    width: 30px; height: 30px;
+    background: var(--accent); border-radius: 8px;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .logo-mark svg { width: 17px; height: 17px; fill: white; }
+  .logo-text { font-size: 16px; font-weight: 600; color: var(--text1); }
+  .notif-btn {
+    margin-left: auto;
+    width: 28px; height: 28px; border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; color: var(--text3); transition: background 0.15s;
+    position: relative;
+  }
+  .notif-btn:hover { background: var(--bg3); color: var(--text2); }
+  .notif-btn svg { width: 16px; height: 16px; }
+  .notif-dot {
+    width: 6px; height: 6px; background: var(--accent);
+    border-radius: 50%; position: absolute; top: 5px; right: 5px;
+    border: 1.5px solid var(--bg2);
+  }
+
+  .sidebar-body { flex: 1; overflow-y: auto; padding: 10px 8px; }
+  .sidebar-body::-webkit-scrollbar { width: 0; }
+
+  .nav-section-label {
+    font-size: 11px; font-weight: 500; letter-spacing: 0.08em;
+    color: var(--text3); text-transform: uppercase;
+    padding: 10px 8px 5px;
+  }
+
+  .nav-item {
+    display: flex; align-items: center; gap: 9px;
+    padding: 8px 10px; border-radius: var(--radius);
+    cursor: pointer; color: var(--text2); font-size: 14px;
+    transition: background 0.12s, color 0.12s;
+    margin-bottom: 1px;
+  }
+  .nav-item:hover { background: var(--bg3); color: var(--text1); }
+  .nav-item.active { background: var(--accent-bg2); color: var(--accent2); }
+  .nav-item svg { width: 16px; height: 16px; flex-shrink: 0; opacity: 0.8; }
+  .nav-item.active svg { opacity: 1; }
+  .nav-badge {
+    margin-left: auto; font-size: 11px; font-weight: 500;
+    background: var(--accent); color: white;
+    padding: 1px 6px; border-radius: 10px; min-width: 18px; text-align: center;
+  }
+
+  .project-item { margin-bottom: 2px; }
+  .project-head {
+    display: flex; align-items: center; gap: 8px;
+    padding: 7px 10px; border-radius: var(--radius);
+    cursor: pointer; color: var(--text2); font-size: 14px;
+    transition: background 0.12s;
+  }
+  .project-head:hover { background: var(--bg3); }
+  .project-head.open { color: var(--text1); }
+  .proj-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+  .proj-dot.indigo { background: var(--accent); }
+  .proj-dot.green { background: var(--green); }
+  .chevron {
+    margin-left: auto; width: 14px; height: 14px;
+    color: var(--text3); transition: transform 0.2s;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px;
+  }
+  .project-head.open .chevron { transform: rotate(90deg); }
+
+  .sub-nav { padding-left: 16px; overflow: hidden; }
+  .sub-nav.collapsed { display: none; }
+  .sub-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 10px; border-radius: 6px;
+    cursor: pointer; font-size: 13px; color: var(--text3);
+    transition: background 0.12s, color 0.12s;
+    margin-bottom: 1px;
+  }
+  .sub-item:hover { background: var(--bg3); color: var(--text2); }
+  .sub-item.active { color: var(--accent2); background: var(--accent-bg); }
+  .sub-item svg { width: 14px; height: 14px; flex-shrink: 0; }
+
+  .new-project-btn {
+    display: flex; align-items: center; gap: 8px;
+    padding: 7px 10px; border-radius: var(--radius);
+    cursor: pointer; color: var(--text3); font-size: 13px;
+    transition: color 0.12s, background 0.12s;
+    margin-top: 4px;
+  }
+  .new-project-btn:hover { color: var(--text2); background: var(--bg3); }
+
+  .sidebar-footer {
+    padding: 12px;
+    border-top: 1px solid var(--border);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .user-avatar {
+    width: 32px; height: 32px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent), #a78bfa);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 600; color: white; flex-shrink: 0;
+  }
+  .user-info { flex: 1; min-width: 0; }
+  .user-name { font-size: 14px; font-weight: 500; color: var(--text1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .user-role { font-size: 12px; color: var(--text3); }
+  .theme-toggle {
+    width: 28px; height: 28px; border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; color: var(--text3); font-size: 14px;
+    transition: background 0.12s, color 0.12s;
+  }
+  .theme-toggle:hover { background: var(--bg3); color: var(--text2); }
+
+  /* ── MAIN ── */
+  .main-area { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+  .topbar {
+    height: var(--topbar-h);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center;
+    padding: 0 24px; gap: 12px;
+    flex-shrink: 0; background: var(--bg);
+  }
+  .topbar-left { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
+  .breadcrumb { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+  .breadcrumb-sep { color: var(--text3); }
+  .breadcrumb-cur { font-weight: 500; color: var(--text1); }
+  .breadcrumb-proj { color: var(--text2); cursor: pointer; }
+  .breadcrumb-proj:hover { color: var(--text1); }
+
+  .topbar-right { display: flex; align-items: center; gap: 8px; }
+  .gh-status {
+    display: flex; align-items: center; gap: 6px;
+    padding: 5px 10px; border-radius: 6px;
+    border: 1px solid rgba(16,185,129,0.3);
+    background: rgba(16,185,129,0.07);
+    font-size: 12px; color: var(--green); cursor: pointer;
+  }
+  .gh-dot-live { width: 6px; height: 6px; background: var(--green); border-radius: 50%; animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+  .topbar-btn {
+    display: flex; align-items: center; gap: 6px;
+    padding: 6px 12px; border-radius: 6px;
+    border: 1px solid var(--border2); background: var(--bg3);
+    font-size: 12px; color: var(--text2); cursor: pointer;
+    font-family: 'Geist', sans-serif; transition: background 0.12s, color 0.12s;
+  }
+  .topbar-btn:hover { background: var(--bg4); color: var(--text1); }
+  .topbar-btn.accent { background: var(--accent); color: white; border-color: var(--accent); }
+  .topbar-btn.accent:hover { opacity: 0.88; }
+  .topbar-btn svg { width: 14px; height: 14px; }
+
+  /* ── PAGE CONTAINER ── */
+  .page-container { flex: 1; overflow: hidden; position: relative; }
+  .page { display: none; height: 100%; overflow-y: auto; padding: 24px; }
+  .page.active { display: block; }
+  .page::-webkit-scrollbar { width: 6px; }
+  .page::-webkit-scrollbar-track { background: transparent; }
+  .page::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+
+  /* ── BOARD PAGE ── */
+  #page-board { padding: 0; display: none; }
+  #page-board.active { display: flex; flex-direction: column; }
+
+  .board-toolbar {
+    padding: 16px 24px; display: flex; align-items: center; gap: 10px;
+    border-bottom: 1px solid var(--border); flex-shrink: 0;
+  }
+  .filter-btn {
+    display: flex; align-items: center; gap: 5px;
+    padding: 5px 10px; border-radius: 6px;
+    border: 1px solid var(--border2); background: transparent;
+    font-size: 12px; color: var(--text2); cursor: pointer;
+    font-family: 'Geist', sans-serif; transition: background 0.12s;
+  }
+  .filter-btn:hover { background: var(--bg3); color: var(--text1); }
+  .filter-sep { width: 1px; height: 18px; background: var(--border); margin: 0 4px; }
+
+  .board-cols-wrap { flex: 1; overflow-x: auto; overflow-y: hidden; padding: 20px 24px; }
+  .board-cols {
+    display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px; height: 100%;
+  }
+  .board-col {
+    background: var(--bg2); border-radius: var(--radius-lg);
+    border: 1px solid var(--border);
+    display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+  .col-head {
+    padding: 14px 16px; display: flex; align-items: center; gap: 8px;
+    border-bottom: 1px solid var(--border); flex-shrink: 0;
+  }
+  .col-title-text { font-size: 12px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text2); }
+  .col-count-badge {
+    font-size: 11px; font-weight: 500;
+    padding: 1px 7px; border-radius: 10px;
+  }
+  .badge-backlog { background: var(--bg4); color: var(--text2); }
+  .badge-progress { background: var(--amber-bg); color: var(--amber); }
+  .badge-done { background: var(--green-bg); color: var(--green); }
+  .col-add-btn {
+    margin-left: auto; width: 22px; height: 22px;
+    border-radius: 5px; display: flex; align-items: center; justify-content: center;
+    cursor: pointer; color: var(--text3); font-size: 16px; transition: background 0.12s, color 0.12s;
+  }
+  .col-add-btn:hover { background: var(--bg3); color: var(--text1); }
+
+  .col-cards { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+  .col-cards::-webkit-scrollbar { width: 0; }
+
+  .kanban-card {
+    background: var(--bg3); border: 1px solid var(--border);
+    border-radius: 10px; padding: 12px 14px;
+    cursor: pointer; transition: border-color 0.15s, transform 0.1s;
+    position: relative; overflow: hidden;
+  }
+  .kanban-card:hover { border-color: var(--border2); transform: translateY(-1px); }
+  .kanban-card.in-prog { }
+  .kanban-card.done-card { opacity: 0.6; }
+
+  .card-priority-bar {
+    position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  }
+  .card-priority-bar.high { background: var(--red); }
+  .card-priority-bar.mid { background: var(--amber); }
+  .card-priority-bar.low { background: var(--text3); }
+
+  .card-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 8px; gap: 8px; }
+  .card-title-text { font-size: 13px; font-weight: 500; color: var(--text1); line-height: 1.4; flex: 1; }
+  .card-priority-label { font-size: 10px; padding: 2px 6px; border-radius: 4px; flex-shrink: 0; }
+  .pl-high { background: var(--red-bg); color: var(--red); }
+  .pl-mid { background: var(--amber-bg); color: var(--amber); }
+  .pl-low { background: var(--bg4); color: var(--text3); }
+
+  .card-branch {
+    display: flex; align-items: center; gap: 5px;
+    font-size: 11px; color: var(--accent2);
+    background: var(--accent-bg); padding: 3px 7px; border-radius: 4px;
+    margin-bottom: 8px; width: fit-content;
+    font-family: 'Geist Mono', monospace;
+  }
+  .card-branch svg { width: 11px; height: 11px; flex-shrink: 0; }
+
+  .card-footer { display: flex; align-items: center; justify-content: space-between; }
+  .card-assignees { display: flex; gap: -4px; }
+  .mini-avatar {
+    width: 22px; height: 22px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px; font-weight: 600; color: white;
+    border: 1.5px solid var(--bg3);
+  }
+  .card-date { font-size: 11px; color: var(--text3); }
+
+  /* ── DASHBOARD ── */
+  .metrics-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 20px; }
+  .metric-card {
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: var(--radius-lg); padding: 18px 20px;
+  }
+  .metric-label-text { font-size: 13px; color: var(--text2); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 10px; }
+  .metric-val { font-size: 32px; font-weight: 600; color: var(--text1); line-height: 1; margin-bottom: 6px; }
+  .metric-val.indigo { color: var(--accent2); }
+  .metric-val.green { color: var(--green); }
+  .metric-val.amber { color: var(--amber); }
+  .metric-sub-text { font-size: 13px; color: var(--text3); }
+
+  .dash-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+  .dash-card {
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: var(--radius-lg); padding: 18px 20px;
+  }
+  .dash-card-title { font-size: 13px; font-weight: 500; color: var(--text2); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 16px; }
+
+  .commit-feed { display: flex; flex-direction: column; gap: 0; }
+  .commit-row {
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 10px 0; border-bottom: 1px solid var(--border);
+  }
+  .commit-row:last-child { border-bottom: none; padding-bottom: 0; }
+  .commit-av {
+    width: 26px; height: 26px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 600; color: white; flex-shrink: 0;
+  }
+  .commit-body { flex: 1; min-width: 0; }
+  .commit-message { font-size: 13px; color: var(--text1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .commit-meta { font-size: 12px; color: var(--text3); margin-top: 3px; }
+  .commit-sha {
+    font-family: 'Geist Mono', monospace; font-size: 10px;
+    color: var(--accent2); background: var(--accent-bg); padding: 1px 5px; border-radius: 3px;
+  }
+
+  .member-bars { display: flex; flex-direction: column; gap: 10px; }
+  .member-bar-row { display: flex; align-items: center; gap: 10px; }
+  .member-bar-name { font-size: 13px; color: var(--text2); width: 65px; flex-shrink: 0; }
+  .bar-track { flex: 1; height: 6px; background: var(--bg4); border-radius: 3px; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 3px; transition: width 0.8s ease; }
+  .bar-num { font-size: 13px; color: var(--text2); width: 20px; text-align: right; }
+
+  .status-donut-wrap { display: flex; align-items: center; gap: 24px; }
+  .donut-legend { display: flex; flex-direction: column; gap: 8px; flex: 1; }
+  .legend-row { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text2); }
+  .legend-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .legend-val { margin-left: auto; font-weight: 500; color: var(--text1); }
+
+  /* ── TODO ── */
+  .todo-page-wrap { max-width: 1080px; }
+  .todo-page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 28px; }
+  .todo-page-title { font-size: 28px; font-weight: 600; color: var(--text1); }
+  .todo-page-sub { font-size: 15px; color: var(--text3); margin-top: 4px; }
+
+  .todo-tabs { display: flex; gap: 6px; margin-bottom: 20px; }
+  .todo-tab {
+    padding: 7px 18px; border-radius: 6px;
+    font-size: 13px; cursor: pointer; color: var(--text2);
+    border: 1px solid transparent; transition: all 0.12s;
+  }
+  .todo-tab.active { background: var(--accent-bg2); color: var(--accent2); border-color: rgba(99,102,241,0.3); }
+  .todo-tab:hover:not(.active) { background: var(--bg3); }
+
+  .todo-add-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 15px 20px; border: 1px dashed var(--border2);
+    border-radius: var(--radius); margin-bottom: 10px;
+    cursor: pointer; color: var(--text3); font-size: 14px;
+    transition: border-color 0.12s, color 0.12s;
+  }
+  .todo-add-row:hover { border-color: var(--accent); color: var(--accent2); }
+
+  .todo-item {
+    display: flex; align-items: center; gap: 14px;
+    padding: 16px 20px; background: var(--bg2);
+    border: 1px solid var(--border); border-radius: var(--radius);
+    margin-bottom: 8px; transition: border-color 0.12s;
+  }
+  .todo-item:hover { border-color: var(--border2); }
+  .todo-checkbox {
+    width: 18px; height: 18px; border-radius: 50%;
+    border: 1.5px solid var(--border2); flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; transition: all 0.15s;
+  }
+  .todo-checkbox.checked { background: var(--accent); border-color: var(--accent); }
+  .todo-checkbox svg { width: 10px; height: 10px; fill: white; }
+  .todo-text-label { flex: 1; font-size: 15px; color: var(--text1); }
+  .todo-text-label.done { text-decoration: line-through; color: var(--text3); }
+  .priority-pill { font-size: 12px; padding: 3px 10px; border-radius: 10px; }
+  .pill-high { background: var(--red-bg); color: var(--red); }
+  .pill-mid { background: var(--amber-bg); color: var(--amber); }
+  .pill-low { background: var(--bg4); color: var(--text3); }
+  .todo-date-label { font-size: 13px; color: var(--text3); }
+  .todo-more { color: var(--text3); cursor: pointer; font-size: 16px; padding: 0 4px; }
+
+  /* ── CALENDAR ── */
+  .cal-toolbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+  .cal-title-text { font-size: 18px; font-weight: 600; color: var(--text1); }
+  .cal-nav { display: flex; align-items: center; gap: 8px; }
+  .cal-nav-btn {
+    width: 30px; height: 30px; border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; border: 1px solid var(--border2); background: var(--bg2); color: var(--text2);
+    font-size: 14px; transition: background 0.12s;
+  }
+  .cal-nav-btn:hover { background: var(--bg3); color: var(--text1); }
+  .view-toggle { display: flex; gap: 3px; background: var(--bg2); padding: 3px; border-radius: 7px; border: 1px solid var(--border); }
+  .view-btn {
+    padding: 4px 12px; border-radius: 5px;
+    font-size: 12px; cursor: pointer; color: var(--text2); transition: all 0.12s;
+  }
+  .view-btn.active { background: var(--accent); color: white; }
+
+  .cal-grid-wrap { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; }
+  .cal-dow-row { display: grid; grid-template-columns: repeat(7, 1fr); background: var(--bg3); }
+  .cal-dow-cell { text-align: center; font-size: 11px; font-weight: 500; color: var(--text3); padding: 10px 0; text-transform: uppercase; letter-spacing: 0.05em; }
+  .cal-cells { display: grid; grid-template-columns: repeat(7, 1fr); }
+  .cal-cell {
+    border-right: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    min-height: 120px; padding: 8px;
+  }
+  .cal-cell:nth-child(7n) { border-right: none; }
+  .cal-day-num { font-size: 12px; color: var(--text3); margin-bottom: 4px; display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; }
+  .cal-day-num.today { background: var(--accent); color: white; border-radius: 50%; font-weight: 600; width: 26px; height: 26px; font-size: 13px; box-shadow: 0 0 0 3px var(--accent-bg2); }
+  .cal-cell.is-today { background: var(--accent-bg); }
+  .cal-day-num.other-month { color: var(--text3); opacity: 0.4; }
+  .cal-event-pill {
+    font-size: 11px; padding: 3px 7px 3px 9px; border-radius: 4px;
+    margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    cursor: pointer; position: relative; font-weight: 500;
+  }
+  .cal-event-pill::before {
+    content: ''; position: absolute; left: 0; top: 0; bottom: 0;
+    width: 3px; border-radius: 4px 0 0 4px;
+  }
+  .ev-indigo { background: var(--accent-bg); color: var(--accent2); }
+  .ev-indigo::before { background: var(--accent); }
+  .ev-green { background: var(--green-bg); color: var(--green); }
+  .ev-green::before { background: var(--green); }
+  .ev-amber { background: var(--amber-bg); color: var(--amber); }
+  .ev-amber::before { background: var(--amber); }
+
+  /* ── SETTINGS ── */
+  .settings-wrap { max-width: 1080px; }
+  .settings-title { font-size: 28px; font-weight: 600; margin-bottom: 10px; color: var(--text1); }
+  .settings-sub { font-size: 15px; color: var(--text3); margin-bottom: 32px; }
+  .settings-section {
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: var(--radius-lg); padding: 30px 34px;
+    margin-bottom: 20px;
+  }
+  .settings-section.danger { border-color: rgba(239,68,68,0.25); background: rgba(239,68,68,0.04); }
+  .settings-sec-title { font-size: 16px; font-weight: 600; color: var(--text1); margin-bottom: 20px; display: flex; align-items: center; gap: 8px; }
+  .settings-sec-title.danger-title { color: var(--red); }
+  .settings-row { display: flex; align-items: center; justify-content: space-between; padding: 16px 0; border-bottom: 1px solid var(--border); }
+  .settings-row:last-child { border-bottom: none; padding-bottom: 0; }
+  .settings-key { font-size: 15px; color: var(--text2); }
+  .settings-val { font-size: 15px; color: var(--text1); }
+  .status-pill { font-size: 11px; padding: 3px 9px; border-radius: 10px; }
+  .pill-ok { background: var(--green-bg); color: var(--green); border: 1px solid rgba(16,185,129,0.2); }
+  .pill-err { background: var(--red-bg); color: var(--red); border: 1px solid rgba(239,68,68,0.2); }
+  .code-display {
+    font-family: 'Geist Mono', monospace; font-size: 20px; font-weight: 500;
+    color: var(--text1); letter-spacing: 0.2em;
+    background: var(--bg3); padding: 8px 14px; border-radius: 7px;
+    border: 1px solid var(--border2);
+  }
+  .inline-btn {
+    padding: 5px 12px; border-radius: 6px; font-size: 12px;
+    border: 1px solid var(--border2); background: var(--bg3);
+    color: var(--text2); cursor: pointer; font-family: 'Geist', sans-serif;
+    transition: background 0.12s, color 0.12s;
+  }
+  .inline-btn:hover { background: var(--bg4); color: var(--text1); }
+  .inline-btn.accent-btn { background: var(--accent-bg); color: var(--accent2); border-color: rgba(99,102,241,0.3); }
+  .danger-btn {
+    padding: 6px 14px; border-radius: 6px; font-size: 12px;
+    border: 1px solid rgba(239,68,68,0.3); background: var(--red-bg);
+    color: var(--red); cursor: pointer; font-family: 'Geist', sans-serif;
+    transition: background 0.12s;
+  }
+  .danger-btn:hover { background: rgba(239,68,68,0.18); }
+  .mono-text { font-family: 'Geist Mono', monospace; font-size: 11px; color: var(--text2); background: var(--bg3); padding: 4px 8px; border-radius: 5px; }
+  .member-list { display: flex; flex-direction: column; gap: 2px; }
+  .member-row-s { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+  .member-row-s:last-child { border-bottom: none; }
+  .m-avatar { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; color: white; }
+  .m-name { flex: 1; font-size: 13px; color: var(--text1); }
+  .m-role { font-size: 11px; color: var(--accent2); }
+  .webhook-url-box { font-family: 'Geist Mono', monospace; font-size: 11px; color: var(--text2); background: var(--bg3); border: 1px solid var(--border2); border-radius: 6px; padding: 8px 12px; word-break: break-all; }
+
+  /* ── util ── */
+  .flex { display: flex; }
+  .items-center { align-items: center; }
+  .gap-8 { gap: 8px; }
+  .ml-auto { margin-left: auto; }
+  .mt-8 { margin-top: 8px; }
+</style>
+</head>
+<body>
+
+<!-- ════ LOGIN ════ -->
+<div class="auth-wrap active" id="screen-login">
+  <div class="auth-bg"></div>
+  <div class="auth-grid"></div>
+  <div class="auth-card">
+    <div class="auth-logo">
+      <div class="auth-logo-icon">
+        <svg viewBox="0 0 16 16"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+      </div>
+      <span class="auth-logo-name">GitManager</span>
+    </div>
+    <div class="auth-title">다시 오셨군요</div>
+    <div class="auth-sub">팀과 GitHub를 하나로 연결하세요</div>
+    <button class="btn-ghost" onclick="goApp()">
+      <svg viewBox="0 0 16 16"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+      GitHub로 계속하기
+    </button>
+    <div class="auth-divider">또는 이메일로 로그인</div>
+    <div class="auth-field">
+      <label>이메일</label>
+      <input type="email" placeholder="name@example.com">
+    </div>
+    <div class="auth-field">
+      <label>비밀번호</label>
+      <input type="password" placeholder="••••••••">
+    </div>
+    <button class="btn-primary" onclick="goApp()">로그인</button>
+    <div class="auth-link">계정이 없으신가요? <a onclick="showScreen('register')">회원가입</a></div>
+  </div>
+</div>
+
+<!-- ════ REGISTER ════ -->
+<div class="auth-wrap" id="screen-register">
+  <div class="auth-bg"></div>
+  <div class="auth-grid"></div>
+  <div class="auth-card">
+    <div class="auth-logo">
+      <div class="auth-logo-icon">
+        <svg viewBox="0 0 16 16"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+      </div>
+      <span class="auth-logo-name">GitManager</span>
+    </div>
+    <div class="auth-title">계정 만들기</div>
+    <div class="auth-sub">지금 바로 시작하세요</div>
+    <div class="auth-field"><label>이름</label><input type="text" placeholder="홍길동"></div>
+    <div class="auth-field"><label>이메일</label><input type="email" placeholder="name@example.com"></div>
+    <div class="auth-field"><label>비밀번호</label><input type="password" placeholder="8자 이상"></div>
+    <button class="btn-primary" onclick="showScreen('verify')">회원가입</button>
+    <div class="auth-link">이미 계정이 있으신가요? <a onclick="showScreen('login')">로그인</a></div>
+  </div>
+</div>
+
+<!-- ════ VERIFY ════ -->
+<div class="auth-wrap" id="screen-verify">
+  <div class="auth-bg"></div>
+  <div class="auth-grid"></div>
+  <div class="auth-card" style="text-align:center;">
+    <div class="auth-logo" style="justify-content:center;">
+      <div class="auth-logo-icon">
+        <svg viewBox="0 0 16 16"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+      </div>
+      <span class="auth-logo-name">GitManager</span>
+    </div>
+    <div style="font-size:40px; margin-bottom: 16px;">✉️</div>
+    <div class="auth-title">이메일을 확인해주세요</div>
+    <div class="auth-sub" style="margin-bottom: 28px;">name@example.com으로 인증코드를 발송했습니다</div>
+    <div class="otp-row">
+      <input maxlength="1" oninput="otpNext(this)">
+      <input maxlength="1" oninput="otpNext(this)">
+      <input maxlength="1" oninput="otpNext(this)">
+      <input maxlength="1" oninput="otpNext(this)">
+      <input maxlength="1" oninput="otpNext(this)">
+      <input maxlength="1" oninput="otpNext(this)">
+    </div>
+    <div class="resend-row">코드를 받지 못하셨나요? <span>재전송 (59s)</span></div>
+    <button class="btn-primary" onclick="goApp()">인증하기</button>
+    <div class="auth-link" style="margin-top:14px;"><a onclick="showScreen('login')">로그인으로 돌아가기</a></div>
+  </div>
+</div>
+
+<!-- ════ APP ════ -->
+<div class="app-wrap" id="screen-app">
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <div class="logo-mark">
+        <svg viewBox="0 0 16 16"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+      </div>
+      <span class="logo-text">GitManager</span>
+      <div class="notif-btn">
+        <div class="notif-dot"></div>
+        <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 16a2 2 0 001.985-1.75c.017-.137-.097-.25-.235-.25h-3.5c-.138 0-.252.113-.235.25A2 2 0 008 16zm.25-14.25a.75.75 0 00-1.5 0v.635a5.5 5.5 0 00-4.75 5.365V9.5l-1.5 2v.5h11v-.5l-1.5-2V7.75A5.5 5.5 0 008.25 2.385V1.75z"/></svg>
+      </div>
+    </div>
+
+    <div class="sidebar-body">
+      <div class="nav-item active" onclick="showPage('todo'); setNavActive(this)">
+        <svg viewBox="0 0 16 16" fill="currentColor"><path d="M2 3h12v2H2zm0 4h12v2H2zm0 4h7v2H2z"/></svg>
+        내 할일
+        <span class="nav-badge">3</span>
+      </div>
+
+      <div class="nav-section-label">프로젝트</div>
+
+      <div class="project-item">
+        <div class="project-head open" onclick="toggleProj(this, 'sub1')">
+          <span class="proj-dot indigo"></span>
+          gitmanager
+          <span class="chevron">▶</span>
+        </div>
+        <div class="sub-nav" id="sub1">
+          <div class="sub-item" onclick="showPage('dashboard'); setSubActive(this)">
+            <svg viewBox="0 0 16 16" fill="currentColor"><path d="M0 0h7v7H0zm9 0h7v7H9zm0 9h7v7H9zm-9 0h7v7H0z"/></svg>
+            대시보드
+          </div>
+          <div class="sub-item" onclick="showPage('board'); setSubActive(this)">
+            <svg viewBox="0 0 16 16" fill="currentColor"><path d="M1 2h4v12H1zm5 0h4v8H6zm5 0h4v5h-4z"/></svg>
+            Board
+          </div>
+          <div class="sub-item" onclick="showPage('calendar'); setSubActive(this)">
+            <svg viewBox="0 0 16 16" fill="currentColor"><rect x="1" y="3" width="14" height="12" rx="1" fill="none" stroke="currentColor" stroke-width="1.2"/><path d="M1 7h14M5 1v4M11 1v4" stroke="currentColor" stroke-width="1.2" fill="none"/></svg>
+            캘린더
+          </div>
+          <div class="sub-item" onclick="showPage('settings'); setSubActive(this)">
+            <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 10a2 2 0 100-4 2 2 0 000 4zm5.67-1.86l.89-.51-.75-1.3-.89.51a4.07 4.07 0 00-.69-.4l-.11-1.02h-1.5l-.11 1.02a4.07 4.07 0 00-.69.4l-.89-.51-.75 1.3.89.51a4 4 0 000 .72l-.89.51.75 1.3.89-.51c.21.16.44.29.69.4l.11 1.02h1.5l.11-1.02c.25-.11.48-.24.69-.4l.89.51.75-1.3-.89-.51a4 4 0 000-.72z"/></svg>
+            설정
+          </div>
+        </div>
+      </div>
+
+      <div class="project-item">
+        <div class="project-head" onclick="toggleProj(this, 'sub2')">
+          <span class="proj-dot green"></span>
+          team-alpha
+          <span class="chevron">▶</span>
+        </div>
+        <div class="sub-nav collapsed" id="sub2">
+          <div class="sub-item" onclick="showPage('dashboard'); setSubActive(this)">
+            <svg viewBox="0 0 16 16" fill="currentColor"><path d="M0 0h7v7H0zm9 0h7v7H9zm0 9h7v7H9zm-9 0h7v7H0z"/></svg>
+            대시보드
+          </div>
+          <div class="sub-item" onclick="showPage('board'); setSubActive(this)">
+            <svg viewBox="0 0 16 16" fill="currentColor"><path d="M1 2h4v12H1zm5 0h4v8H6zm5 0h4v5h-4z"/></svg>
+            Board
+          </div>
+          <div class="sub-item" onclick="showPage('calendar'); setSubActive(this)">
+            <svg viewBox="0 0 16 16" fill="currentColor"><rect x="1" y="3" width="14" height="12" rx="1" fill="none" stroke="currentColor" stroke-width="1.2"/><path d="M1 7h14M5 1v4M11 1v4" stroke="currentColor" stroke-width="1.2" fill="none"/></svg>
+            캘린더
+          </div>
+          <div class="sub-item" onclick="showPage('settings'); setSubActive(this)">
+            <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 10a2 2 0 100-4 2 2 0 000 4zm5.67-1.86l.89-.51-.75-1.3-.89.51a4.07 4.07 0 00-.69-.4l-.11-1.02h-1.5l-.11 1.02a4.07 4.07 0 00-.69.4l-.89-.51-.75 1.3.89.51a4 4 0 000 .72l-.89.51.75 1.3.89-.51c.21.16.44.29.69.4l.11 1.02h1.5l.11-1.02c.25-.11.48-.24.69-.4l.89.51.75-1.3-.89-.51a4 4 0 000-.72z"/></svg>
+            설정
+          </div>
+        </div>
+      </div>
+
+      <div class="new-project-btn">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 2a.75.75 0 01.75.75v4.5h4.5a.75.75 0 010 1.5h-4.5v4.5a.75.75 0 01-1.5 0v-4.5h-4.5a.75.75 0 010-1.5h4.5v-4.5A.75.75 0 018 2z"/></svg>
+        새 프로젝트 만들기
+      </div>
+    </div>
+
+    <div class="sidebar-footer">
+      <div class="user-avatar">정</div>
+      <div class="user-info">
+        <div class="user-name">정민</div>
+        <div class="user-role">Developer</div>
+      </div>
+      <div class="theme-toggle" onclick="toggleTheme()" title="테마 전환">◐</div>
+    </div>
+  </div>
+
+  <!-- MAIN -->
+  <div class="main-area">
+    <div class="topbar">
+      <div class="topbar-left">
+        <div class="breadcrumb">
+          <span class="breadcrumb-proj" id="bc-proj">gitmanager</span>
+          <span class="breadcrumb-sep">/</span>
+          <span class="breadcrumb-cur" id="bc-cur">내 할일</span>
+        </div>
+      </div>
+      <div class="topbar-right" id="topbar-actions">
+        <div class="gh-status">
+          <span class="gh-dot-live"></span>
+          GitHub 연동됨
+        </div>
+      </div>
+    </div>
+
+    <div class="page-container">
+
+      <!-- TODO PAGE -->
+      <div class="page active" id="page-todo">
+        <div class="todo-page-wrap">
+          <div class="todo-page-header">
+            <div>
+              <div class="todo-page-title">내 할일</div>
+              <div class="todo-page-sub">3개 미완료 · 1개 완료</div>
+            </div>
+          </div>
+          <div class="todo-tabs">
+            <div class="todo-tab active">전체</div>
+            <div class="todo-tab">오늘</div>
+            <div class="todo-tab">이번 주</div>
+            <div class="todo-tab">완료됨</div>
+          </div>
+          <div class="todo-add-row">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 2a.75.75 0 01.75.75v4.5h4.5a.75.75 0 010 1.5h-4.5v4.5a.75.75 0 01-1.5 0v-4.5h-4.5a.75.75 0 010-1.5h4.5v-4.5A.75.75 0 018 2z"/></svg>
+            할일 추가 (Enter)
+          </div>
+          <div class="todo-item">
+            <div class="todo-checkbox"></div>
+            <div class="todo-text-label">Webhook HMAC-SHA256 검증 로직 작성</div>
+            <span class="priority-pill pill-high">High</span>
+            <span class="todo-date-label">오늘</span>
+            <span class="todo-more">⋯</span>
+          </div>
+          <div class="todo-item">
+            <div class="todo-checkbox"></div>
+            <div class="todo-text-label">칸반 보드 드래그 앤 드롭 테스트</div>
+            <span class="priority-pill pill-mid">Mid</span>
+            <span class="todo-date-label">내일</span>
+            <span class="todo-more">⋯</span>
+          </div>
+          <div class="todo-item">
+            <div class="todo-checkbox"></div>
+            <div class="todo-text-label">AWS RDS 보안그룹 인바운드 규칙 확인</div>
+            <span class="priority-pill pill-mid">Mid</span>
+            <span class="todo-date-label">04/30</span>
+            <span class="todo-more">⋯</span>
+          </div>
+          <div class="todo-item" style="opacity:0.5;">
+            <div class="todo-checkbox checked">
+              <svg viewBox="0 0 10 10"><polyline points="1.5,5 4,7.5 8.5,2" stroke="white" stroke-width="1.5" fill="none"/></svg>
+            </div>
+            <div class="todo-text-label done">Docker Compose 로컬 환경 테스트</div>
+            <span class="priority-pill pill-low">Low</span>
+            <span class="todo-date-label">완료</span>
+            <span class="todo-more">⋯</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- BOARD PAGE -->
+      <div class="page" id="page-board">
+        <div class="board-toolbar">
+          <button class="topbar-btn accent" style="font-size:12px; padding:6px 12px;">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 2a.75.75 0 01.75.75v4.5h4.5a.75.75 0 010 1.5h-4.5v4.5a.75.75 0 01-1.5 0v-4.5h-4.5a.75.75 0 010-1.5h4.5v-4.5A.75.75 0 018 2z"/></svg>
+            카드 추가
+          </button>
+        </div>
+        <div class="board-cols-wrap">
+          <div class="board-cols">
+            <!-- BACKLOG -->
+            <div class="board-col">
+              <div class="col-head">
+                <span class="col-title-text">Backlog</span>
+                <span class="col-count-badge badge-backlog" id="count-backlog">4</span>
+                <div class="col-add-btn">+</div>
+              </div>
+              <div class="col-cards" id="cards-backlog">
+                <div class="kanban-card">
+                  <div class="card-priority-bar high"></div>
+                  <div class="card-header">
+                    <div class="card-title-text">사용자 인증 API 설계 및 JWT 토큰 발급 로직</div>
+                    <span class="card-priority-label pl-high">High</span>
+                  </div>
+                  <div class="card-branch">
+                    <svg viewBox="0 0 16 16" fill="currentColor"><path d="M11.75 2.5a.75.75 0 100 1.5.75.75 0 000-1.5zm-2.25.75a2.25 2.25 0 113 2.122V6A2.5 2.5 0 019 8.5H7a1 1 0 00-1 1v1.128a2.251 2.251 0 11-1.5 0V5.372a2.25 2.25 0 111.5 0v1.836A2.492 2.492 0 017 7h2a1 1 0 001-1v-.628A2.25 2.25 0 019.5 3.25zM4.25 12a.75.75 0 100 1.5.75.75 0 000-1.5z"/></svg>
+                    feat/auth-api
+                  </div>
+                  <div class="card-footer">
+                    <div class="card-assignees">
+                      <div class="mini-avatar" style="background:#6366f1;">김</div>
+                    </div>
+                    <span class="card-date">05/02</span>
+                  </div>
+                </div>
+                <div class="kanban-card">
+                  <div class="card-priority-bar mid"></div>
+                  <div class="card-header">
+                    <div class="card-title-text">이메일 인증 코드 발송 및 검증</div>
+                    <span class="card-priority-label pl-mid">Mid</span>
+                  </div>
+                  <div class="card-branch">
+                    <svg viewBox="0 0 16 16" fill="currentColor"><path d="M11.75 2.5a.75.75 0 100 1.5.75.75 0 000-1.5zm-2.25.75a2.25 2.25 0 113 2.122V6A2.5 2.5 0 019 8.5H7a1 1 0 00-1 1v1.128a2.251 2.251 0 11-1.5 0V5.372a2.25 2.25 0 111.5 0v1.836A2.492 2.492 0 017 7h2a1 1 0 001-1v-.628A2.25 2.25 0 019.5 3.25zM4.25 12a.75.75 0 100 1.5.75.75 0 000-1.5z"/></svg>
+                    feat/email-verify
+                  </div>
+                  <div class="card-footer">
+                    <div class="card-assignees">
+                      <div class="mini-avatar" style="background:#10b981;">이</div>
+                    </div>
+                    <span class="card-date">05/05</span>
+                  </div>
+                </div>
+                <div class="kanban-card">
+                  <div class="card-priority-bar low"></div>
+                  <div class="card-header">
+                    <div class="card-title-text">S3 파일 업로드 서버 릴레이 모듈</div>
+                    <span class="card-priority-label pl-low">Low</span>
+                  </div>
+                  <div class="card-footer">
+                    <div class="card-assignees">
+                      <div class="mini-avatar" style="background:#f59e0b;">박</div>
+                    </div>
+                    <span class="card-date" style="color: var(--text3); font-style:italic;">브랜치 미연동</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <!-- IN PROGRESS -->
+            <div class="board-col">
+              <div class="col-head">
+                <span class="col-title-text">In Progress</span>
+                <span class="col-count-badge badge-progress" id="count-progress">3</span>
+                <div class="col-add-btn">+</div>
+              </div>
+              <div class="col-cards" id="cards-progress">
+                <div class="kanban-card in-prog">
+                  <div class="card-priority-bar high"></div>
+                  <div class="card-header">
+                    <div class="card-title-text">칸반 보드 드래그 앤 드롭 구현</div>
+                    <span class="card-priority-label pl-high">High</span>
+                  </div>
+                  <div class="card-branch">
+                    <svg viewBox="0 0 16 16" fill="currentColor"><path d="M11.75 2.5a.75.75 0 100 1.5.75.75 0 000-1.5zm-2.25.75a2.25 2.25 0 113 2.122V6A2.5 2.5 0 019 8.5H7a1 1 0 00-1 1v1.128a2.251 2.251 0 11-1.5 0V5.372a2.25 2.25 0 111.5 0v1.836A2.492 2.492 0 017 7h2a1 1 0 001-1v-.628A2.25 2.25 0 019.5 3.25zM4.25 12a.75.75 0 100 1.5.75.75 0 000-1.5z"/></svg>
+                    feat/kanban-dnd
+                  </div>
+                  <div class="card-footer">
+                    <div class="card-assignees">
+                      <div class="mini-avatar" style="background:#6366f1;">정</div>
+                    </div>
+                    <span class="card-date">04/30</span>
+                  </div>
+                </div>
+                <div class="kanban-card in-prog">
+                  <div class="card-priority-bar mid"></div>
+                  <div class="card-header">
+                    <div class="card-title-text">GitHub Webhook 수신 엔드포인트</div>
+                    <span class="card-priority-label pl-mid">Mid</span>
+                  </div>
+                  <div class="card-branch">
+                    <svg viewBox="0 0 16 16" fill="currentColor"><path d="M11.75 2.5a.75.75 0 100 1.5.75.75 0 000-1.5zm-2.25.75a2.25 2.25 0 113 2.122V6A2.5 2.5 0 019 8.5H7a1 1 0 00-1 1v1.128a2.251 2.251 0 11-1.5 0V5.372a2.25 2.25 0 111.5 0v1.836A2.492 2.492 0 017 7h2a1 1 0 001-1v-.628A2.25 2.25 0 019.5 3.25zM4.25 12a.75.75 0 100 1.5.75.75 0 000-1.5z"/></svg>
+                    feat/webhook-receiver
+                  </div>
+                  <div class="card-footer">
+                    <div class="card-assignees">
+                      <div class="mini-avatar" style="background:#ec4899;">최</div>
+                    </div>
+                    <span class="card-date">05/01</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <!-- DONE -->
+            <div class="board-col">
+              <div class="col-head">
+                <span class="col-title-text">Done</span>
+                <span class="col-count-badge badge-done" id="count-done">5</span>
+                <div class="col-add-btn">+</div>
+              </div>
+              <div class="col-cards" id="cards-done">
+                <div class="kanban-card done-card">
+                  <div class="card-priority-bar low"></div>
+                  <div class="card-header">
+                    <div class="card-title-text">프로젝트 초기 세팅 및 폴더 구조</div>
+                    <span class="card-priority-label pl-low">Low</span>
+                  </div>
+                  <div class="card-branch">
+                    <svg viewBox="0 0 16 16" fill="currentColor"><path d="M11.75 2.5a.75.75 0 100 1.5.75.75 0 000-1.5zm-2.25.75a2.25 2.25 0 113 2.122V6A2.5 2.5 0 019 8.5H7a1 1 0 00-1 1v1.128a2.251 2.251 0 11-1.5 0V5.372a2.25 2.25 0 111.5 0v1.836A2.492 2.492 0 017 7h2a1 1 0 001-1v-.628A2.25 2.25 0 019.5 3.25zM4.25 12a.75.75 0 100 1.5.75.75 0 000-1.5z"/></svg>
+                    chore/init
+                  </div>
+                  <div class="card-footer">
+                    <div class="card-assignees">
+                      <div class="mini-avatar" style="background:#6366f1;">정</div>
+                    </div>
+                    <span class="card-date">완료</span>
+                  </div>
+                </div>
+                <div class="kanban-card done-card">
+                  <div class="card-priority-bar mid"></div>
+                  <div class="card-header">
+                    <div class="card-title-text">ERD 설계 및 DB 마이그레이션 스크립트</div>
+                    <span class="card-priority-label pl-mid">Mid</span>
+                  </div>
+                  <div class="card-branch">
+                    <svg viewBox="0 0 16 16" fill="currentColor"><path d="M11.75 2.5a.75.75 0 100 1.5.75.75 0 000-1.5zm-2.25.75a2.25 2.25 0 113 2.122V6A2.5 2.5 0 019 8.5H7a1 1 0 00-1 1v1.128a2.251 2.251 0 11-1.5 0V5.372a2.25 2.25 0 111.5 0v1.836A2.492 2.492 0 017 7h2a1 1 0 001-1v-.628A2.25 2.25 0 019.5 3.25zM4.25 12a.75.75 0 100 1.5.75.75 0 000-1.5z"/></svg>
+                    chore/schema
+                  </div>
+                  <div class="card-footer">
+                    <div class="card-assignees">
+                      <div class="mini-avatar" style="background:#10b981;">김</div>
+                    </div>
+                    <span class="card-date">완료</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- DASHBOARD PAGE -->
+      <div class="page" id="page-dashboard">
+        <div class="metrics-row">
+          <div class="metric-card">
+            <div class="metric-label-text">전체 카드</div>
+            <div class="metric-val">12</div>
+            <div class="metric-sub-text">이번 주 +2 추가</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label-text">진행 중</div>
+            <div class="metric-val amber">3</div>
+            <div class="metric-sub-text">In Progress</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label-text">이번 주 커밋</div>
+            <div class="metric-val indigo">24</div>
+            <div class="metric-sub-text">전주 대비 +8</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label-text">완료율</div>
+            <div class="metric-val green">42%</div>
+            <div class="metric-sub-text">5 / 12 완료</div>
+          </div>
+        </div>
+        <div style="margin-bottom: 14px;">
+          <div class="dash-card">
+            <div class="dash-card-title">최근 커밋</div>
+            <div class="commit-feed">
+              <div class="commit-row">
+                <div class="commit-av" style="background:#6366f1;">정</div>
+                <div class="commit-body">
+                  <div class="commit-message">feat: add HMAC-SHA256 webhook signature validation</div>
+                  <div class="commit-meta">1시간 전 · <span class="commit-sha">a3f9b12</span></div>
+                </div>
+              </div>
+              <div class="commit-row">
+                <div class="commit-av" style="background:#10b981;">김</div>
+                <div class="commit-body">
+                  <div class="commit-message">fix: resolve JWT expiry edge case on refresh</div>
+                  <div class="commit-meta">3시간 전 · <span class="commit-sha">7d2c841</span></div>
+                </div>
+              </div>
+              <div class="commit-row">
+                <div class="commit-av" style="background:#f59e0b;">최</div>
+                <div class="commit-body">
+                  <div class="commit-message">chore: update docker-compose network config</div>
+                  <div class="commit-meta">5시간 전 · <span class="commit-sha">1e5fa09</span></div>
+                </div>
+              </div>
+              <div class="commit-row">
+                <div class="commit-av" style="background:#ec4899;">이</div>
+                <div class="commit-body">
+                  <div class="commit-message">feat: email verification OTP generation</div>
+                  <div class="commit-meta">어제 · <span class="commit-sha">b88cd4e</span></div>
+                </div>
+              </div>
+              <div class="commit-row">
+                <div class="commit-av" style="background:#6366f1;">정</div>
+                <div class="commit-body">
+                  <div class="commit-message">refactor: extract webhook event handler to service layer</div>
+                  <div class="commit-meta">어제 · <span class="commit-sha">c21d003</span></div>
+                </div>
+              </div>
+              <div class="commit-row">
+                <div class="commit-av" style="background:#10b981;">김</div>
+                <div class="commit-body">
+                  <div class="commit-message">feat: add invite code generation and validation</div>
+                  <div class="commit-meta">2일 전 · <span class="commit-sha">f74a819</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="dash-row">
+          <div class="dash-card">
+            <div class="dash-card-title">카드 현황</div>
+            <div class="status-donut-wrap">
+              <svg width="100" height="100" viewBox="0 0 100 100">
+                <circle cx="50" cy="50" r="38" fill="none" stroke="#222940" stroke-width="14"/>
+                <circle cx="50" cy="50" r="38" fill="none" stroke="#6366f1" stroke-width="14" stroke-dasharray="33 105" stroke-dashoffset="0" transform="rotate(-90 50 50)"/>
+                <circle cx="50" cy="50" r="38" fill="none" stroke="#f59e0b" stroke-width="14" stroke-dasharray="20 118" stroke-dashoffset="-33" transform="rotate(-90 50 50)"/>
+                <circle cx="50" cy="50" r="38" fill="none" stroke="#10b981" stroke-width="14" stroke-dasharray="42 96" stroke-dashoffset="-53" transform="rotate(-90 50 50)"/>
+                <text x="50" y="55" text-anchor="middle" font-size="14" font-weight="600" fill="#f0f4ff" font-family="Geist,sans-serif">12</text>
+              </svg>
+              <div class="donut-legend">
+                <div class="legend-row"><span class="legend-dot" style="background:#6366f1;"></span>Backlog<span class="legend-val">4</span></div>
+                <div class="legend-row"><span class="legend-dot" style="background:#f59e0b;"></span>In Progress<span class="legend-val">3</span></div>
+                <div class="legend-row"><span class="legend-dot" style="background:#10b981;"></span>Done<span class="legend-val">5</span></div>
+              </div>
+            </div>
+          </div>
+          <div class="dash-card">
+            <div class="dash-card-title">멤버별 담당 카드</div>
+            <div class="member-bars">
+              <div class="member-bar-row">
+                <div class="member-bar-name">정민</div>
+                <div class="bar-track"><div class="bar-fill" style="width:80%;background:#6366f1;"></div></div>
+                <div class="bar-num">4</div>
+              </div>
+              <div class="member-bar-row">
+                <div class="member-bar-name">김지수</div>
+                <div class="bar-track"><div class="bar-fill" style="width:60%;background:#10b981;"></div></div>
+                <div class="bar-num">3</div>
+              </div>
+              <div class="member-bar-row">
+                <div class="member-bar-name">이현우</div>
+                <div class="bar-track"><div class="bar-fill" style="width:40%;background:#ec4899;"></div></div>
+                <div class="bar-num">2</div>
+              </div>
+              <div class="member-bar-row">
+                <div class="member-bar-name">최수연</div>
+                <div class="bar-track"><div class="bar-fill" style="width:60%;background:#f59e0b;"></div></div>
+                <div class="bar-num">3</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- CALENDAR PAGE -->
+      <div class="page" id="page-calendar">
+        <div class="cal-toolbar">
+          <div style="position:relative;">
+            <div class="cal-title-text" id="cal-title" onclick="toggleDatePicker()" style="cursor:pointer; user-select:none; display:flex; align-items:center; gap:8px;">
+              <span id="cal-title-text">2025년 4월</span>
+              <svg id="cal-title-chevron" width="14" height="14" viewBox="0 0 16 16" fill="currentColor" style="color:var(--text3); transition:transform 0.2s;"><path d="M4.5 6.5l3.5 3.5 3.5-3.5"/><path d="M4.5 6.5l3.5 3.5 3.5-3.5" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </div>
+            <div id="date-picker" style="display:none; position:absolute; top:calc(100% + 8px); left:0; z-index:100;
+              background:var(--bg2); border:1px solid var(--border2); border-radius:12px;
+              padding:16px; width:280px; box-shadow:0 8px 24px rgba(0,0,0,0.18);">
+              <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;">
+                <div id="dp-year-prev" onclick="dpChangeYear(-1)" style="width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;cursor:pointer;border:1px solid var(--border2);color:var(--text2); font-size:14px;" onmouseenter="this.style.background='var(--bg3)'" onmouseleave="this.style.background='transparent'">‹</div>
+                <div id="dp-year-label" style="font-size:15px;font-weight:600;color:var(--text1);"></div>
+                <div id="dp-year-next" onclick="dpChangeYear(1)" style="width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;cursor:pointer;border:1px solid var(--border2);color:var(--text2); font-size:14px;" onmouseenter="this.style.background='var(--bg3)'" onmouseleave="this.style.background='transparent'">›</div>
+              </div>
+              <div id="dp-months" style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;"></div>
+            </div>
+          </div>
+          <button class="topbar-btn accent" style="font-size:12px; padding:6px 12px;">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 2a.75.75 0 01.75.75v4.5h4.5a.75.75 0 010 1.5h-4.5v4.5a.75.75 0 01-1.5 0v-4.5h-4.5a.75.75 0 010-1.5h4.5v-4.5A.75.75 0 018 2z"/></svg>
+            일정 추가
+          </button>
+        </div>
+        <div class="cal-grid-wrap">
+          <div class="cal-dow-row">
+            <div class="cal-dow-cell">일</div>
+            <div class="cal-dow-cell">월</div>
+            <div class="cal-dow-cell">화</div>
+            <div class="cal-dow-cell">수</div>
+            <div class="cal-dow-cell">목</div>
+            <div class="cal-dow-cell">금</div>
+            <div class="cal-dow-cell">토</div>
+          </div>
+          <div class="cal-cells" id="cal-cells"></div>
+        </div>
+      </div>
+
+      <!-- SETTINGS PAGE -->
+      <div class="page" id="page-settings">
+        <div class="settings-wrap">
+          <div class="settings-title">프로젝트 설정</div>
+          <div class="settings-sub">gitmanager · 프로젝트 구성 및 연동 관리</div>
+
+          <div class="settings-section">
+            <div class="settings-sec-title">GitHub 연동</div>
+            <div class="settings-row">
+              <span class="settings-key">연동 상태</span>
+              <span class="status-pill pill-ok">● 연결됨</span>
+            </div>
+            <div class="settings-row">
+              <span class="settings-key">연동 저장소</span>
+              <span class="settings-val">jeongmin / gitmanager</span>
+            </div>
+            <div class="settings-row">
+              <span class="settings-key">Webhook URL</span>
+              <div class="webhook-url-box">https://api.gitmanager.io/webhook/proj_a3f9b12c</div>
+            </div>
+            <div style="margin-top: 10px;">
+              <button class="inline-btn">Webhook 재설정</button>
+            </div>
+          </div>
+
+          <div class="settings-section">
+            <div class="settings-sec-title">팀 초대</div>
+            <div class="settings-row">
+              <span class="settings-key">초대 코드</span>
+              <div style="display:flex; align-items:center; gap:10px;">
+                <span class="code-display">A4X9KR</span>
+                <button class="inline-btn accent-btn">복사</button>
+                <button class="inline-btn">재생성</button>
+              </div>
+            </div>
+            <div style="font-size:12px; color:var(--text3); margin-top:6px;">이 코드를 팀원에게 공유하면 프로젝트에 참여할 수 있습니다.</div>
+          </div>
+
+          <div class="settings-section">
+            <div class="settings-sec-title">멤버 관리</div>
+            <div class="member-list">
+              <div class="member-row-s">
+                <div class="m-avatar" style="background: linear-gradient(135deg,#6366f1,#a78bfa);">정</div>
+                <div class="m-name">정민</div>
+                <span class="m-role">Owner</span>
+              </div>
+              <div class="member-row-s">
+                <div class="m-avatar" style="background:#10b981;">김</div>
+                <div class="m-name">김지수</div>
+                <div style="display:flex; align-items:center; gap:6px;">
+                  <span style="font-size:12px; color:var(--text2);">Member</span>
+                  <button class="inline-btn" style="font-size:11px;">추방</button>
+                </div>
+              </div>
+              <div class="member-row-s">
+                <div class="m-avatar" style="background:#ec4899;">이</div>
+                <div class="m-name">이현우</div>
+                <div style="display:flex; align-items:center; gap:6px;">
+                  <span style="font-size:12px; color:var(--text2);">Member</span>
+                  <button class="inline-btn" style="font-size:11px;">추방</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="settings-section danger">
+            <div class="settings-sec-title danger-title">위험 구역</div>
+            <div class="settings-row">
+              <div>
+                <div style="font-size:13px; color:var(--text1);">프로젝트 삭제</div>
+                <div style="font-size:12px; color:var(--text3); margin-top:2px;">삭제 후 복구할 수 없습니다.</div>
+              </div>
+              <button class="danger-btn">프로젝트 삭제</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+
+  // ── CALENDAR ──
+  const CAL_EVENTS = {
+    '2025-4-2':  [{text:'스프린트 시작', cls:'ev-indigo'}],
+    '2025-4-7':  [{text:'PR 리뷰 미팅', cls:'ev-amber'}],
+    '2025-4-15': [{text:'3주차 체크포인트', cls:'ev-green'}],
+    '2025-4-19': [{text:'팀 주간 회의', cls:'ev-indigo'}],
+    '2025-4-24': [{text:'배포 마감', cls:'ev-amber'}],
+    '2025-5-3':  [{text:'스프린트 리뷰', cls:'ev-green'}],
+    '2025-5-12': [{text:'팀 회식', cls:'ev-indigo'}],
+    '2025-6-1':  [{text:'6월 킥오프', cls:'ev-amber'}],
+  };
+
+  let calYear = 2025, calMonth = 4;
+  let dpYear = 2025;
+  let datePickerOpen = false;
+
+  function renderCalendar() {
+    const months = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
+    document.getElementById('cal-title-text').textContent = calYear + '년 ' + months[calMonth - 1];
+
+    const today = new Date();
+    const firstDay = new Date(calYear, calMonth - 1, 1).getDay();
+    const daysInMonth = new Date(calYear, calMonth, 0).getDate();
+    const daysInPrev = new Date(calYear, calMonth - 1, 0).getDate();
+
+    let cells = '';
+    // 이전 달 채우기
+    for (let i = firstDay - 1; i >= 0; i--) {
+      cells += '<div class="cal-cell"><div class="cal-day-num other-month">' + (daysInPrev - i) + '</div></div>';
+    }
+    // 이번 달
+    for (let d = 1; d <= daysInMonth; d++) {
+      const isToday = (today.getFullYear() === calYear && today.getMonth() + 1 === calMonth && today.getDate() === d);
+      const dayNumClass = 'cal-day-num' + (isToday ? ' today' : '');
+      const key = calYear + '-' + calMonth + '-' + d;
+      const events = CAL_EVENTS[key] || [];
+      const evHtml = events.map(e => '<div class="cal-event-pill ' + e.cls + '">' + e.text + '</div>').join('');
+      const cellClass = isToday ? 'cal-cell is-today' : 'cal-cell';
+      cells += '<div class="' + cellClass + '"><div class="' + dayNumClass + '">' + d + '</div>' + evHtml + '</div>';
+    }
+    // 다음 달 채우기
+    const total = firstDay + daysInMonth;
+    const remaining = total % 7 === 0 ? 0 : 7 - (total % 7);
+    for (let d = 1; d <= remaining; d++) {
+      cells += '<div class="cal-cell"><div class="cal-day-num other-month">' + d + '</div></div>';
+    }
+    document.getElementById('cal-cells').innerHTML = cells;
+  }
+
+  function calMove(dir) {
+    calMonth += dir;
+    if (calMonth > 12) { calMonth = 1; calYear++; }
+    if (calMonth < 1)  { calMonth = 12; calYear--; }
+    renderCalendar();
+  }
+
+  function calToday() {
+    const t = new Date();
+    calYear = t.getFullYear();
+    calMonth = t.getMonth() + 1;
+    renderCalendar();
+  }
+
+  function toggleDatePicker() {
+    datePickerOpen = !datePickerOpen;
+    const dp = document.getElementById('date-picker');
+    const chevron = document.getElementById('cal-title-chevron');
+    if (datePickerOpen) {
+      dpYear = calYear;
+      renderDatePicker();
+      dp.style.display = 'block';
+      chevron.style.transform = 'rotate(180deg)';
+    } else {
+      dp.style.display = 'none';
+      chevron.style.transform = 'rotate(0deg)';
+    }
+  }
+
+  function renderDatePicker() {
+    document.getElementById('dp-year-label').textContent = dpYear + '년';
+    const months = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
+    const grid = document.getElementById('dp-months');
+    grid.innerHTML = months.map((m, i) => {
+      const mo = i + 1;
+      const isActive = (dpYear === calYear && mo === calMonth);
+      const activeAttr = isActive ? ' data-active="1"' : '';
+      return '<div class="dp-month-btn" data-mo="' + mo + '"' + activeAttr + '>' + m + '</div>';
+    }).join('');
+    grid.querySelectorAll('.dp-month-btn').forEach(el => {
+      const mo = parseInt(el.dataset.mo);
+      const isActive = !!el.dataset.active;
+      el.style.cssText = 'padding:7px 0;text-align:center;border-radius:7px;cursor:pointer;font-size:12px;font-weight:500;border:1px solid transparent;' +
+        (isActive ? 'background:var(--accent);color:white;' : 'background:var(--bg3);color:var(--text2);');
+      el.addEventListener('click', () => dpSelectMonth(mo));
+      if (!isActive) {
+        el.addEventListener('mouseenter', () => { el.style.background = 'var(--bg4)'; });
+        el.addEventListener('mouseleave', () => { el.style.background = 'var(--bg3)'; });
+      }
+    });
+  }
+
+  function dpChangeYear(dir) {
+    dpYear += dir;
+    renderDatePicker();
+  }
+
+  function dpSelectMonth(mo) {
+    calYear = dpYear;
+    calMonth = mo;
+    renderCalendar();
+    toggleDatePicker();
+  }
+
+  document.addEventListener('click', function(e) {
+    if (datePickerOpen && !e.target.closest('#date-picker') && !e.target.closest('#cal-title')) {
+      toggleDatePicker();
+    }
+  });
+
+  document.addEventListener('DOMContentLoaded', function() { renderCalendar(); });
+
+  function updateBoardCounts() {
+    ['backlog','progress','done'].forEach(col => {
+      const cards = document.getElementById('cards-' + col);
+      const badge = document.getElementById('count-' + col);
+      if (cards && badge) {
+        badge.textContent = cards.querySelectorAll('.kanban-card').length;
+      }
+    });
+  }
+
+  document.addEventListener('DOMContentLoaded', updateBoardCounts);
+
+  function toggleTheme() {
+    const html = document.documentElement;
+    html.classList.toggle('light');
+    const isLight = html.classList.contains('light');
+    document.querySelector('.theme-toggle').textContent = isLight ? '☀' : '◐';
+    localStorage.setItem('theme', isLight ? 'light' : 'dark');
+  }
+
+  (function() {
+    if (localStorage.getItem('theme') === 'light') {
+      document.documentElement.classList.add('light');
+      document.addEventListener('DOMContentLoaded', () => {
+        const btn = document.querySelector('.theme-toggle');
+        if (btn) btn.textContent = '☀';
+      });
+    }
+  })();
+
+  function showScreen(name) {
+    document.querySelectorAll('.auth-wrap, .app-wrap').forEach(el => {
+      el.classList.remove('active');
+    });
+    const el = document.getElementById('screen-' + name);
+    if (el) el.classList.add('active');
+  }
+
+  function goApp() {
+    document.querySelectorAll('.auth-wrap').forEach(el => el.classList.remove('active'));
+    document.getElementById('screen-app').classList.add('active');
+    showPage('todo');
+  }
+
+  function showPage(name) {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    const p = document.getElementById('page-' + name);
+    if (p) p.classList.add('active');
+
+    const labels = { todo:'내 할일', board:'Board', dashboard:'대시보드', calendar:'캘린더', settings:'설정' };
+    document.getElementById('bc-cur').textContent = labels[name] || name;
+
+    const ta = document.getElementById('topbar-actions');
+    if (name === 'settings') {
+      ta.innerHTML = '';
+    } else {
+      ta.innerHTML = '<div class="gh-status"><span class="gh-dot-live"></span>GitHub 연동됨</div>';
+    }
+  }
+
+  function setNavActive(el) {
+    document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+    el.classList.add('active');
+    document.querySelectorAll('.sub-item').forEach(i => i.classList.remove('active'));
+  }
+
+  function setSubActive(el) {
+    document.querySelectorAll('.sub-item, .nav-item').forEach(i => i.classList.remove('active'));
+    el.classList.add('active');
+  }
+
+  function toggleProj(head, subId) {
+    const sub = document.getElementById(subId);
+    const isOpen = head.classList.contains('open');
+    if (isOpen) {
+      head.classList.remove('open');
+      sub.classList.add('collapsed');
+    } else {
+      head.classList.add('open');
+      sub.classList.remove('collapsed');
+    }
+  }
+
+  function otpNext(input) {
+    if (input.value.length === 1) {
+      const next = input.nextElementSibling;
+      if (next) next.focus();
+    }
+  }
+</script>
+</body>
+</html>

@@ -24,7 +24,7 @@ client.interceptors.response.use(
   (res) => res,
   async (error) => {
     const original = error.config
-    if (error.response?.status === 401 && !original._retry) {
+    if (error.response?.status === 401 && !original._retry && !original.url?.startsWith('/auth/')) {
       original._retry = true
       try {
         const { data } = await axios.post('/api/auth/refresh', {}, { withCredentials: true })
