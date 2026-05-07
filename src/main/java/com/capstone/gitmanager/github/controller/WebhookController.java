@@ -4,6 +4,7 @@ import com.capstone.gitmanager.common.dto.ApiResponse;
 import com.capstone.gitmanager.common.exception.CustomException;
 import com.capstone.gitmanager.common.exception.ErrorCode;
 import com.capstone.gitmanager.github.dto.WebhookPayload;
+import com.capstone.gitmanager.github.entity.ProjectGithub;
 import com.capstone.gitmanager.github.service.WebhookService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -34,10 +35,10 @@ public class WebhookController {
         if (payload.repository == null || payload.repository.name == null) {
             throw new CustomException(ErrorCode.GITHUB_NOT_CONFIGURED);
         }
-        webhookService.verifySignature(payload.repository.name, signature, rawBody);
+        ProjectGithub github = webhookService.verifySignature(payload.repository.name, signature, rawBody);
 
         switch (event) {
-            case "create" -> webhookService.handleCreate(payload);
+            case "create" -> webhookService.handleCreate(payload, github);
             case "delete" -> webhookService.handleDelete(payload);
             case "push" -> webhookService.handlePush(payload);
             case "pull_request" -> webhookService.handlePullRequest(payload);

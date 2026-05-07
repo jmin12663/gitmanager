@@ -107,7 +107,7 @@ export default function RegisterPage() {
     }
   }
 
-  async function handleRegister(e: React.FormEvent) {
+  async function handleRegister(e: React.SyntheticEvent) {
     e.preventDefault()
     if (!emailVerified) {
       setError('이메일 인증을 먼저 완료해주세요.')

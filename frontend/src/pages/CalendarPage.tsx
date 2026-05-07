@@ -12,9 +12,9 @@ const MONTHS = ['1월', '2월', '3월', '4월', '5월', '6월', '7월', '8월', 
 const FC_COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#3b82f6']
 
 function addOneDay(dateStr: string): string {
-  const d = new Date(dateStr + 'T00:00:00')
-  d.setDate(d.getDate() + 1)
-  return d.toISOString().slice(0, 10)
+  const [y, m, d] = dateStr.split('-').map(Number)
+  const next = new Date(y, m - 1, d + 1)
+  return `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}-${String(next.getDate()).padStart(2, '0')}`
 }
 
 function scheduleToEvent(s: Schedule): EventInput {
@@ -49,7 +49,7 @@ function CreateScheduleModal({ defaultDate = '', onClose, onCreate }: CreateSche
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.SyntheticEvent) {
     e.preventDefault()
     if (!title.trim()) { setError('제목을 입력하세요.'); return }
     if (!startDate || !endDate) { setError('날짜를 입력하세요.'); return }
@@ -117,7 +117,7 @@ function EditScheduleModal({ id, initialTitle, initialStartDate, initialEndDate,
   const [deleteLoading, setDeleteLoading] = useState(false)
   const [error, setError] = useState('')
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.SyntheticEvent) {
     e.preventDefault()
     if (!title.trim()) { setError('제목을 입력하세요.'); return }
     if (startDate > endDate) { setError('종료일은 시작일 이후여야 합니다.'); return }
@@ -229,7 +229,7 @@ export default function CalendarPage() {
     const mid = new Date((arg.start.getTime() + arg.end.getTime()) / 2)
     setYear(mid.getFullYear())
     setMonth(mid.getMonth() + 1)
-    loadSchedules(arg.startStr.slice(0, 10), arg.endStr.slice(0, 10))
+    void loadSchedules(arg.startStr.slice(0, 10), arg.endStr.slice(0, 10))
   }
 
   function handleDateClick(arg: DateClickArg) {
@@ -250,7 +250,7 @@ export default function CalendarPage() {
     await updateScheduleApi(pid, id, { title, startDate, endDate })
     const api = calendarRef.current?.getApi()
     if (api) {
-      loadSchedules(
+      void loadSchedules(
         api.view.activeStart.toISOString().slice(0, 10),
         api.view.activeEnd.toISOString().slice(0, 10),
       )
@@ -266,7 +266,7 @@ export default function CalendarPage() {
     await createScheduleApi(pid, { title, startDate, endDate })
     const api = calendarRef.current?.getApi()
     if (api) {
-      loadSchedules(
+      void loadSchedules(
         api.view.activeStart.toISOString().slice(0, 10),
         api.view.activeEnd.toISOString().slice(0, 10),
       )

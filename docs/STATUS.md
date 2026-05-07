@@ -8,13 +8,20 @@
 - [x] BaseEntity, ApiResponse, GlobalExceptionHandler 공통 클래스
 - [x] CORS 설정 (CorsConfigurationSource 빈 등록 + SecurityConfig .cors() 위임 — Spring Security 필터 레벨에서 처리)
 - [x] 기능 1: 회원 관리 + JWT (1차: RT 저장/만료 검증)
-  - [x] UX 개선: 로그인 시 이메일 미인증 계정 → `/verify?email=xxx`로 자동 리다이렉트 (loginId 입력 시에도 실제 이메일 자동 전달)
-  - [x] `GET /api/auth/me` — 페이지 새로고침 후 세션 복구용 (userId, loginId, name, email 반환)
-  - [x] `GET /api/auth/check-login-id` — 아이디 중복 확인 (인증 필요)
-  - [x] `PATCH /api/auth/login-id` — 아이디 변경 (중복 확인 후 저장)
+  - [x] `POST /api/auth/send-email-code` — 이메일 인증코드 전송 (PreEmailVerification 엔티티)
+  - [x] `POST /api/auth/verify-email-code` — 이메일 인증코드 확인
+  - [x] `POST /api/auth/register` — 회원가입
+  - [x] `POST /api/auth/login` — 로그인 (미인증 계정 → `/verify?email=xxx` 자동 리다이렉트)
+  - [x] `POST /api/auth/refresh` — Access Token 재발급
+  - [x] `POST /api/auth/logout` — 로그아웃 (Refresh Token 무효화)
+  - [x] `GET /api/auth/me` — 세션 복구용 (userId, loginId, name, email 반환)
+  - [x] `PATCH /api/auth/me` — 프로필 수정 (name)
+  - [x] `PATCH /api/auth/password` — 비밀번호 변경
+  - [x] `GET /api/auth/check-login-id` — 아이디 중복 확인
+  - [x] `PATCH /api/auth/login-id` — 아이디 변경
 - [x] 기능 2: 팀 프로젝트 관리 (초대 코드 방식)
 - [x] 기능 3: 개인 ToDo
-- [x] 기능 4: Develop Board
+- [x] 기능 4: Develop Board (카드 CRUD, 담당자, 댓글, Branch 연결, 카드 수정 시 담당자 변경, 카드에 댓글 수 배지 표시)
   - [x] 카드 CRUD (생성/조회/수정/삭제/상태변경)
   - [x] 담당자 다대다 (card_assignees)
   - [x] 댓글 CRUD (soft delete, 작성자만 삭제)
@@ -42,27 +49,25 @@
 - [x] 모노레포 구조 전환 (`gitmanager/frontend/`) + 빌드 outDir → `../src/main/resources/static`
 - [x] 기능 1: 로그인 / 회원가입 / 이메일 인증 페이지
 - [x] 기능 2: 사이드바 + 팀 프로젝트 관리
-- [x] 기능 3: 개인 ToDo 페이지
-  - [x] 할일 목록 조회 / 추가(Enter) / 체크 토글 / 삭제
-  - [x] 탭 필터 (전체 / 미완료 / 완료)
+- [x] 기능 3: 개인 ToDo 페이지 - 할일 목록(조회/추가/체크/삭제), 탭 필터(전체 / 미완료 / 완료)
   - 참고: 백엔드에 priority/dueDate 없음 → createdAt 기준 날짜 표시, priority pill 미구현
 - [x] 기능 4: Develop Board (칸반) — 3컬럼 칸반, DnD 상태변경, 카드 생성/상세/삭제, 댓글 CRUD
 - [x] 기능 6: 캘린더 페이지 — 월별 그리드, 연/월 피커, 일정 추가(날 클릭)/삭제
 - [x] 기능 7: 대시보드 페이지 — 메트릭 카드 4개, 최근 커밋 피드, 도넛 차트, 멤버 바 차트
-- [x] 기능 8: 프로젝트 설정 — GitHub 연동(등록/재설정), 초대코드(복사/재생성), 멤버 관리(목록/추방/탈퇴), 프로젝트 삭제
+- [x] 기능 8: 프로젝트 설정 — GitHub 연동(등록/재설정/불러오기), 초대코드(복사/재생성), 멤버 관리(목록/추방/탈퇴), 프로젝트 삭제
 - [x] 프로필 페이지 — 이름 수정, 아이디 수정(중복 확인 → 저장), 비밀번호 변경
 
 ### 공통 인프라 (완료)
 - [x] `src/index.css` — `--gm-*` 디자인 토큰 + auth/sidebar/topbar/todo CSS 전체
 - [x] `src/api/client.ts` — axios + Bearer 헤더 + 401 자동 refresh
-- [x] `src/api/auth.ts` — login / register / verifyEmail / getMe
-- [x] `src/api/project.ts` — getMyProjects / createProject / joinProject
+- [x] `src/api/auth.ts` — login / register / sendEmailCode / verifyEmailCode / getMe / logout / updateProfile / checkLoginId / updateLoginId / changePassword
+- [x] `src/api/project.ts` — getMyProjects / createProject / joinProject / getProject / getProjectMembers / updateProject
 - [x] `src/api/todo.ts` — getTodos / createTodo / toggleTodo / deleteTodo
-- [x] `src/api/board.ts` — getBoard / createCard / getCard / updateCard / updateCardStatus / deleteCard / getComments / createComment / deleteComment
+- [x] `src/api/board.ts` — getBoard / createCard / getCard / updateCard / updateCardStatus / deleteCard / getComments / createComment / deleteComment / addBranch / removeBranch
 - [x] `src/api/calendar.ts` — getSchedules / createSchedule / updateSchedule / deleteSchedule
 - [x] `src/api/dashboard.ts` — getDashboard
 - [x] `src/types/board.ts`, `calendar.ts`, `dashboard.ts` — 타입 정의
-- [x] `src/api/settings.ts` — getInviteCode / regenerateInviteCode / getMembers / kickMember / leaveProject / deleteProject / getGithubConfig / registerGithubConfig
+- [x] `src/api/settings.ts` — getInviteCode / regenerateInviteCode / getMembers / kickMember / leaveProject / deleteProject / getGithubConfig / getOAuthRedirectUrl
 - [x] `src/components/AppLayout.tsx` — 사이드바 + topbar + Outlet (미인증 시 /login 리다이렉트)
 - [x] `src/store/` — AuthContext + AuthProvider (세션 복구)
 - [x] `src/types/project.ts` — Project, ProjectRole

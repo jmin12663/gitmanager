@@ -48,8 +48,8 @@ function DonutChart({ backlog, inProgress, done, total }: DonutChartProps) {
   ]
 
   return (
-    <svg width="100" height="100" viewBox="0 0 100 100">
-      <circle cx="50" cy="50" r={r} fill="none" stroke="var(--gm-bg4)" strokeWidth="14" />
+    <svg width="140" height="140" viewBox="0 0 100 100">
+      <circle cx="50" cy="50" r={r} fill="none" stroke="var(--gm-bg4)" strokeWidth="12" />
       {total > 0 && segments.map((s, i) =>
         s.len > 0 ? (
           <circle
@@ -57,7 +57,7 @@ function DonutChart({ backlog, inProgress, done, total }: DonutChartProps) {
             cx="50" cy="50" r={r}
             fill="none"
             stroke={s.color}
-            strokeWidth="14"
+            strokeWidth="12"
             strokeDasharray={`${s.len} ${circum - s.len}`}
             strokeDashoffset={-s.offset}
             transform="rotate(-90 50 50)"

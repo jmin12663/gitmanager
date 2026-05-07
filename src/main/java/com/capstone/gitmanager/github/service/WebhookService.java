@@ -32,7 +32,7 @@ public class WebhookService {
     private final CardBranchRepository cardBranchRepository;
     private final CommitLogRepository commitLogRepository;
 
-    public void verifySignature(String repoName, String signature, String payload) {
+    public ProjectGithub verifySignature(String repoName, String signature, String payload) {
         ProjectGithub github = projectGithubRepository.findByRepoName(repoName)
                 .orElseThrow(() -> new CustomException(ErrorCode.GITHUB_NOT_CONFIGURED));
 
@@ -40,10 +40,11 @@ public class WebhookService {
         if (!expected.equals(signature)) {
             throw new CustomException(ErrorCode.WEBHOOK_SIGNATURE_INVALID);
         }
+        return github;
     }
 
     @Transactional
-    public void handleCreate(WebhookPayload payload) {
+    public void handleCreate(WebhookPayload payload, ProjectGithub github) {
         // tag 생성은 무시
         if (!"branch".equals(payload.refType)) return;
 
@@ -55,9 +56,6 @@ public class WebhookService {
                 .findByRepoNameAndIdBranchName(repoName, branchName)
                 .isPresent();
         if (alreadyLinked) return;
-
-        ProjectGithub github = projectGithubRepository.findByRepoName(repoName)
-                .orElseThrow(() -> new CustomException(ErrorCode.GITHUB_NOT_CONFIGURED));
 
         Card card = Card.builder()
                 .projectId(github.getProjectId())
@@ -125,9 +123,7 @@ public class WebhookService {
         String repoName = payload.repository.name;
 
         cardBranchRepository.findByRepoNameAndIdBranchName(repoName, branchName)
-                .ifPresent(cardBranch -> {
-                    cardBranch.getCard().markMerged(LocalDateTime.now());
-                });
+                .ifPresent(cardBranch -> cardBranch.getCard().markMerged(LocalDateTime.now()));
     }
 
     private String extractBranchName(String ref) {

@@ -52,7 +52,7 @@ export default function VerifyPage() {
     inputRefs.current[Math.min(pasted.length, OTP_LENGTH - 1)]?.focus()
   }
 
-  async function handleVerify(e: React.FormEvent) {
+  async function handleVerify(e: React.SyntheticEvent) {
     e.preventDefault()
     const code = digits.join('')
     if (code.length < OTP_LENGTH) {

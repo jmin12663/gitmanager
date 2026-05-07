@@ -32,7 +32,7 @@ public class PreEmailVerification {
     private boolean verified = false;
 
     @Column(nullable = false, updatable = false)
-    private LocalDateTime createdAt = LocalDateTime.now();
+    private final LocalDateTime createdAt = LocalDateTime.now();
 
     @Builder
     private PreEmailVerification(String email, String code, LocalDateTime expiresAt) {

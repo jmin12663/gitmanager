@@ -117,7 +117,7 @@ export default function TodoPage() {
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === 'Enter' && !e.nativeEvent.isComposing) handleAdd()
+    if (e.key === 'Enter' && !e.nativeEvent.isComposing) void handleAdd()
     if (e.key === 'Escape') {
       setInputText('')
       setFocused(false)

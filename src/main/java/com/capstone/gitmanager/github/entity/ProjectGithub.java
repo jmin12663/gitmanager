@@ -23,25 +23,32 @@ public class ProjectGithub {
     @Column(nullable = false)
     private String repoName;
 
-    @Column(nullable = false)
-    private String patEncrypted;
+    @Column(nullable = false, length = 500)
+    private String oauthTokenEncrypted;
 
     @Column(nullable = false)
     private String webhookSecret;
 
+    @Column
+    private Long webhookId;
+
     @Builder
-    private ProjectGithub(Long projectId, String repoUrl, String repoName, String patEncrypted, String webhookSecret) {
+    private ProjectGithub(Long projectId, String repoUrl, String repoName,
+                          String oauthTokenEncrypted, String webhookSecret, Long webhookId) {
         this.projectId = projectId;
         this.repoUrl = repoUrl;
         this.repoName = repoName;
-        this.patEncrypted = patEncrypted;
+        this.oauthTokenEncrypted = oauthTokenEncrypted;
         this.webhookSecret = webhookSecret;
+        this.webhookId = webhookId;
     }
 
-    public void update(String repoUrl, String repoName, String patEncrypted, String webhookSecret) {
+    public void update(String repoUrl, String repoName, String oauthTokenEncrypted,
+                       String webhookSecret, Long webhookId) {
         this.repoUrl = repoUrl;
         this.repoName = repoName;
-        this.patEncrypted = patEncrypted;
+        this.oauthTokenEncrypted = oauthTokenEncrypted;
         this.webhookSecret = webhookSecret;
+        this.webhookId = webhookId;
     }
 }

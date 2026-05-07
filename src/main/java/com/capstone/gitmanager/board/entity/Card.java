@@ -50,10 +50,10 @@ public class Card extends BaseEntity {
     private LocalDateTime mergedAt;
 
     @OneToMany(mappedBy = "card", cascade = CascadeType.ALL, orphanRemoval = true)
-    private Set<CardAssignee> assignees = new HashSet<>();
+    private final Set<CardAssignee> assignees = new HashSet<>();
 
     @OneToMany(mappedBy = "card", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<CardBranch> branches = new ArrayList<>();
+    private final List<CardBranch> branches = new ArrayList<>();
 
     @Builder
     private Card(Long projectId, String title, LocalDate dueDate, String memo, Long createdBy) {

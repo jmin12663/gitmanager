@@ -1,7 +1,6 @@
 package com.capstone.gitmanager.dashboard.service;
 
 import com.capstone.gitmanager.board.entity.Card;
-import com.capstone.gitmanager.board.entity.CardAssignee;
 import com.capstone.gitmanager.board.entity.CardStatus;
 import com.capstone.gitmanager.board.repository.CardRepository;
 import com.capstone.gitmanager.board.repository.CommitLogRepository;

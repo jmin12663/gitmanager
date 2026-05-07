@@ -15,3 +15,9 @@ export const joinProjectApi = (inviteCode: string) =>
 
 export const getProjectMembersApi = (projectId: number) =>
   client.get(`/projects/${projectId}/members`)
+
+export const getProjectApi = (projectId: number) =>
+  client.get(`/projects/${projectId}`)
+
+export const updateProjectApi = (projectId: number, body: { name: string; description?: string; startDate?: string; endDate?: string }) =>
+  client.patch(`/projects/${projectId}`, body)

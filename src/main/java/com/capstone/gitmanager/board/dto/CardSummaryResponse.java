@@ -11,15 +11,17 @@ public record CardSummaryResponse(
         String title,
         CardStatus status,
         LocalDate dueDate,
-        List<AssigneeResponse> assignees
+        List<AssigneeResponse> assignees,
+        long commentCount
 ) {
-    public static CardSummaryResponse from(Card card) {
+    public static CardSummaryResponse from(Card card, long commentCount) {
         return new CardSummaryResponse(
                 card.getId(),
                 card.getTitle(),
                 card.getStatus(),
                 card.getDueDate(),
-                card.getAssignees().stream().map(AssigneeResponse::from).toList()
+                card.getAssignees().stream().map(AssigneeResponse::from).toList(),
+                commentCount
         );
     }
 }

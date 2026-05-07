@@ -9,7 +9,7 @@
 - `card_branch`: 복합 PK (card_id, branch_name)
 - `card_assignees`: 복합 PK (card_id, user_id)
 - `commit_logs`: commit_sha UNIQUE → 중복 Webhook 방지
-- `project_github`: project_id가 PK이자 FK, PAT는 Jasypt 암호화 (AES_SECRET_KEY)
+- `project_github`: project_id가 PK이자 FK, GitHub OAuth access token은 Jasypt 암호화 (AES_SECRET_KEY)
 ```
 
 ---
@@ -18,7 +18,7 @@
 
 ```
 users (1) ─────────────── (N) refresh_tokens
-users (1) ─────────────── (N) email_verification_tokens
+pre_email_verifications (FK 없음 — 회원가입 전 이메일 인증용, email 컬럼으로 식별)
 users (1) ─────────────── (N) todos
 users (N) ─────────────── (N) projects  →  user_project (중간 테이블)
 projects (1) ──────────── (1) project_github
@@ -48,15 +48,16 @@ CREATE TABLE users (
     PRIMARY KEY (id)
 );
 
--- 이메일 인증 토큰 (인증 완료 후 삭제)
-CREATE TABLE email_verification_tokens (
+-- 이메일 사전 인증 (회원가입 전 이메일 인증용 — users FK 없음, email로 식별)
+-- verified=true 확인 후 register API에서 회원 생성
+CREATE TABLE pre_email_verifications (
     id         BIGINT       NOT NULL AUTO_INCREMENT,
-    user_id    BIGINT       NOT NULL,
-    token      VARCHAR(255) NOT NULL UNIQUE,
+    email      VARCHAR(255) NOT NULL UNIQUE,
+    code       VARCHAR(255) NOT NULL,
     expires_at DATETIME(6)  NOT NULL,
+    verified   BOOLEAN      NOT NULL DEFAULT FALSE,
     created_at DATETIME(6)  NOT NULL,
-    PRIMARY KEY (id),
-    FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+    PRIMARY KEY (id)
 );
 
 -- Refresh Token
@@ -100,13 +101,14 @@ CREATE TABLE user_project (
 );
 
 -- GitHub 연동 (project_id 가 PK 이자 FK → 프로젝트당 1개)
--- pat_encrypted: Jasypt 암호화 (PBEWITHHMACSHA512ANDAES_256), 키는 환경변수 AES_SECRET_KEY
+-- oauth_token_encrypted: GitHub OAuth access token을 Jasypt로 암호화
 CREATE TABLE project_github (
-    project_id     BIGINT       NOT NULL,
-    repo_url       VARCHAR(255) NOT NULL,
-    repo_name      VARCHAR(255) NOT NULL,
-    pat_encrypted  VARCHAR(500) NOT NULL,
-    webhook_secret VARCHAR(255) NOT NULL,
+    project_id             BIGINT       NOT NULL,
+    repo_url               VARCHAR(255) NOT NULL,
+    repo_name              VARCHAR(255) NOT NULL,
+    oauth_token_encrypted  VARCHAR(500) NOT NULL,
+    webhook_secret         VARCHAR(255) NOT NULL,
+    webhook_id             BIGINT,
     PRIMARY KEY (project_id),
     FOREIGN KEY (project_id) REFERENCES projects (id) ON DELETE CASCADE
 );
@@ -222,5 +224,6 @@ CREATE TABLE todos (
 | `project_github` 에 `created_at`, `updated_at` 없음 | BaseEntity 미상속, 시점 추적 불필요 |
 | `user_project.role` OWNER/MEMBER | 초대 코드 조회·재발급, 팀원 강퇴 권한 분리 |
 | `card_assignees` 별도 테이블 | 카드-유저 다대다, 복합 PK (card_id, user_id) |
+| `pre_email_verifications` users FK 없음 | 회원가입 전 인증이므로 아직 user 레코드가 없음. email+code로 식별, verified=true 확인 후 register 허용 |
 | `refresh_tokens.is_used` | 1차 미사용, 8주차 RTR 적용 시 활성화 |
-| `pat_encrypted` Jasypt 암호화 | PAT 평문 저장 금지, 키는 환경변수 `AES_SECRET_KEY` |
+| `oauth_token_encrypted` Jasypt 암호화 | GitHub OAuth access token 평문 저장 금지, 키는 환경변수 `AES_SECRET_KEY` |

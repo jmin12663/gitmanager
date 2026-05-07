@@ -1,12 +1,9 @@
 package com.capstone.gitmanager.github.controller;
 
 import com.capstone.gitmanager.common.dto.ApiResponse;
-import com.capstone.gitmanager.github.dto.ProjectGithubRequest;
 import com.capstone.gitmanager.github.dto.ProjectGithubResponse;
 import com.capstone.gitmanager.github.service.ProjectGithubService;
-import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
@@ -25,14 +22,12 @@ public class ProjectGithubController {
         return ApiResponse.ok(projectGithubService.getGithubConfig(projectId, userId));
     }
 
-    @PostMapping
-    @ResponseStatus(HttpStatus.CREATED)
-    public ApiResponse<ProjectGithubResponse> registerGithubConfig(
+    @PostMapping("/sync")
+    public ApiResponse<Void> syncGithub(
             @PathVariable Long projectId,
-            @AuthenticationPrincipal Long userId,
-            @Valid @RequestBody ProjectGithubRequest request
+            @AuthenticationPrincipal Long userId
     ) {
-        return ApiResponse.ok(projectGithubService.registerGithubConfig(projectId, userId, request));
+        projectGithubService.syncGithub(projectId, userId);
+        return ApiResponse.ok();
     }
-
 }

@@ -26,7 +26,7 @@ const DashboardIcon = () => (
 )
 
 const BoardIcon = () => (
-  <svg viewBox="0 0 16 16" fill="currentColor"><path d="M1 2h4v12H1zM6 2h4v12H6zM11 2h4v12H11z" /></svg>
+  <svg viewBox="0 0 16 16" fill="currentColor"><path d="M1 10h3v4H1zM6 6h3v8H6zM11 2h3v12H11z" /></svg>
 )
 
 const CalendarIcon = () => (
@@ -77,7 +77,7 @@ function CreateProjectModal({ onClose, onCreated }: CreateModalProps) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.SyntheticEvent) {
     e.preventDefault()
     if (!name.trim()) { setError('프로젝트 이름을 입력하세요.'); return }
     setLoading(true)
@@ -137,7 +137,7 @@ function JoinProjectModal({ onClose, onJoined }: JoinModalProps) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.SyntheticEvent) {
     e.preventDefault()
     if (code.trim().length !== 6) { setError('6자리 초대 코드를 입력하세요.'); return }
     setLoading(true)
@@ -232,14 +232,14 @@ export default function AppLayout() {
   }, [user, currentProjectId])
 
   useEffect(() => {
-    if (!currentProjectId) {
+    if (!user || !currentProjectId) {
       setGithubConnected(null)
       return
     }
     getGithubConfigApi(currentProjectId)
-      .then(() => setGithubConnected(true))
+      .then(res => setGithubConnected(!!res.data.data))
       .catch(() => setGithubConnected(false))
-  }, [currentProjectId])
+  }, [currentProjectId, user])
 
   useEffect(() => {
     if (!showProfileMenu) return
@@ -423,7 +423,7 @@ export default function AppLayout() {
             <div className="user-avatar">{userInitial}</div>
             <div className="user-info">
               <div className="user-name">{user?.name}</div>
-              <div className="user-role">Developer</div>
+              <div className="user-role">{currentProject ? (currentProject.myRole === 'OWNER' ? 'Owner' : 'Member') : '—'}</div>
             </div>
           </button>
           <button

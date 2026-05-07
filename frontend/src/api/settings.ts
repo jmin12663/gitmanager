@@ -21,7 +21,8 @@ export const deleteProjectApi = (projectId: number) =>
 export const getGithubConfigApi = (projectId: number) =>
   client.get(`/projects/${projectId}/github`)
 
-export const registerGithubConfigApi = (
-  projectId: number,
-  body: { repoUrl: string; repoName: string; pat: string; webhookSecret: string }
-) => client.post(`/projects/${projectId}/github`, body)
+export const getOAuthRedirectUrlApi = (projectId: number, repoUrl: string) =>
+  client.get('/github/oauth/redirect', { params: { projectId, repoUrl } })
+
+export const syncGithubApi = (projectId: number) =>
+  client.post(`/projects/${projectId}/github/sync`)

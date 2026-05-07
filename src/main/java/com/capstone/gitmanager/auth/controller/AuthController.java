@@ -3,7 +3,6 @@ package com.capstone.gitmanager.auth.controller;
 import com.capstone.gitmanager.auth.dto.ChangePasswordRequest;
 import com.capstone.gitmanager.auth.dto.EmailVerifyRequest;
 import com.capstone.gitmanager.auth.dto.LoginRequest;
-import com.capstone.gitmanager.auth.dto.LoginResponse;
 import com.capstone.gitmanager.auth.dto.RegisterRequest;
 import com.capstone.gitmanager.auth.dto.SendEmailCodeRequest;
 import com.capstone.gitmanager.auth.dto.TokenRefreshResponse;
@@ -45,12 +44,6 @@ public class AuthController {
     @PostMapping("/register")
     public ApiResponse<Void> register(@Valid @RequestBody RegisterRequest request) {
         authService.register(request);
-        return ApiResponse.ok();
-    }
-
-    @PostMapping("/verify-email")
-    public ApiResponse<Void> verifyEmail(@Valid @RequestBody EmailVerifyRequest request) {
-        authService.verifyEmail(request);
         return ApiResponse.ok();
     }
 

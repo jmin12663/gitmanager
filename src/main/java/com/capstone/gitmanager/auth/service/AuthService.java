@@ -10,11 +10,9 @@ import com.capstone.gitmanager.auth.dto.TokenRefreshResponse;
 import com.capstone.gitmanager.auth.dto.UpdateLoginIdRequest;
 import com.capstone.gitmanager.auth.dto.UpdateProfileRequest;
 import com.capstone.gitmanager.auth.dto.UserResponse;
-import com.capstone.gitmanager.auth.entity.EmailVerificationToken;
 import com.capstone.gitmanager.auth.entity.PreEmailVerification;
 import com.capstone.gitmanager.auth.entity.RefreshToken;
 import com.capstone.gitmanager.auth.entity.User;
-import com.capstone.gitmanager.auth.repository.EmailVerificationTokenRepository;
 import com.capstone.gitmanager.auth.repository.PreEmailVerificationRepository;
 import com.capstone.gitmanager.auth.repository.RefreshTokenRepository;
 import com.capstone.gitmanager.auth.repository.UserRepository;
@@ -50,7 +48,6 @@ public class AuthService {
     private boolean cookieSecure;
 
     private final UserRepository userRepository;
-    private final EmailVerificationTokenRepository emailTokenRepository;
     private final PreEmailVerificationRepository preEmailVerificationRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     private final PasswordEncoder passwordEncoder;
@@ -114,20 +111,6 @@ public class AuthService {
         userRepository.save(user);
 
         preEmailVerificationRepository.deleteByEmail(request.email());
-    }
-
-    @Transactional
-    public void verifyEmail(EmailVerifyRequest request) {
-        EmailVerificationToken emailToken = emailTokenRepository
-                .findByUser_EmailAndToken(request.email(), request.code())
-                .orElseThrow(() -> new CustomException(ErrorCode.INVALID_EMAIL_TOKEN));
-
-        if (emailToken.isExpired()) {
-            throw new CustomException(ErrorCode.EMAIL_TOKEN_EXPIRED);
-        }
-
-        emailToken.getUser().verifyEmail();
-        emailTokenRepository.deleteByUser(emailToken.getUser());
     }
 
     @Transactional

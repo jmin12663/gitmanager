@@ -44,14 +44,15 @@ public class SecurityConfig {
                                 "/api/auth/send-email-code",  // 이메일 인증코드 전송
                                 "/api/auth/verify-email-code",// 이메일 인증코드 확인
                                 "/api/auth/register",         // 회원가입
-                                "/api/auth/verify-email",     // 이메일 인증 (레거시)
                                 "/api/auth/login",            // 로그인
                                 "/api/auth/logout",           // 로그아웃
                                 "/api/auth/refresh",          // 토큰 재발급
-                                "/api/webhook/**"             // GitHub Webhook
+                                "/api/webhook/**",            // GitHub Webhook
+                                "/api/github/oauth/callback"  // GitHub OAuth 콜백 (GitHub이 직접 호출)
                         ).permitAll()
                         .requestMatchers(
                                 "/",
+                                "/index.html",
                                 "/assets/**",
                                 "/favicon.svg",
                                 "/icons.svg",

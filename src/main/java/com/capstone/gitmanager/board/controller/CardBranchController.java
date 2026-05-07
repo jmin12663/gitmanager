@@ -2,7 +2,7 @@ package com.capstone.gitmanager.board.controller;
 
 import com.capstone.gitmanager.board.dto.BranchResponse;
 import com.capstone.gitmanager.board.dto.CardBranchRequest;
-import com.capstone.gitmanager.board.service.CardBranchService;
+import com.capstone.gitmanager.board.service.CardService;
 import com.capstone.gitmanager.common.dto.ApiResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 public class CardBranchController {
 
-    private final CardBranchService cardBranchService;
+    private final CardService cardService;
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
@@ -25,7 +25,7 @@ public class CardBranchController {
             @AuthenticationPrincipal Long userId,
             @Valid @RequestBody CardBranchRequest request
     ) {
-        return ApiResponse.ok(cardBranchService.addBranch(projectId, cardId, userId, request));
+        return ApiResponse.ok(cardService.addBranch(projectId, cardId, userId, request));
     }
 
     @DeleteMapping("/{branchName}")
@@ -35,7 +35,7 @@ public class CardBranchController {
             @PathVariable String branchName,
             @AuthenticationPrincipal Long userId
     ) {
-        cardBranchService.removeBranch(projectId, cardId, userId, branchName);
+        cardService.removeBranch(projectId, cardId, userId, branchName);
         return ApiResponse.ok();
     }
 }

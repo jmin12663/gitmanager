@@ -9,7 +9,7 @@ export const createCardApi = (projectId: number, body: { title: string; dueDate?
 export const getCardApi = (projectId: number, cardId: number) =>
   client.get(`/projects/${projectId}/cards/${cardId}`)
 
-export const updateCardApi = (projectId: number, cardId: number, body: { title: string; dueDate?: string; memo?: string }) =>
+export const updateCardApi = (projectId: number, cardId: number, body: { title: string; dueDate?: string; memo?: string; assigneeIds?: number[] }) =>
   client.patch(`/projects/${projectId}/cards/${cardId}`, body)
 
 export const updateCardStatusApi = (projectId: number, cardId: number, status: string) =>
@@ -29,3 +29,6 @@ export const deleteCommentApi = (projectId: number, cardId: number, commentId: n
 
 export const addBranchApi = (projectId: number, cardId: number, body: { branchName: string; repoName: string }) =>
   client.post(`/projects/${projectId}/cards/${cardId}/branches`, body)
+
+export const removeBranchApi = (projectId: number, cardId: number, branchName: string) =>
+  client.delete(`/projects/${projectId}/cards/${cardId}/branches/${encodeURIComponent(branchName)}`)

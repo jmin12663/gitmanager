@@ -35,10 +35,17 @@ jasypt:
     iv-generator-classname: org.jasypt.iv.RandomIvGenerator
 
 cors:
-  allowed-origins: http://localhost:3000
+  allowed-origins: http://localhost:5173
 
 cookie:
   secure: false
 
 server:
   port: 8080
+
+github:
+  client-id: ${GITHUB_CLIENT_ID}
+  client-secret: ${GITHUB_CLIENT_SECRET}
+  redirect-uri: ${GITHUB_REDIRECT_URI:http://localhost:8080/api/github/oauth/callback}
+  webhook-base-url: ${GITHUB_WEBHOOK_BASE_URL:http://localhost:8080}
+  frontend-url: ${FRONTEND_URL:http://localhost:5173}

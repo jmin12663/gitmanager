@@ -14,6 +14,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
 
 @Service
 @RequiredArgsConstructor
@@ -22,7 +25,9 @@ public class CardService {
 
     private final CardRepository cardRepository;
     private final CardAssigneeRepository cardAssigneeRepository;
+    private final CardBranchRepository cardBranchRepository;
     private final CommitLogRepository commitLogRepository;
+    private final CommentRepository commentRepository;
     private final UserRepository userRepository;
     private final UserProjectRepository userProjectRepository;
 
@@ -30,19 +35,23 @@ public class CardService {
         validateProjectMember(projectId, userId);
         List<Card> cards = cardRepository.findAllByProjectId(projectId);
 
+        List<Long> cardIds = cards.stream().map(Card::getId).toList();
+        Map<Long, Long> commentCounts = commentRepository.countByCardIds(cardIds).stream()
+                .collect(Collectors.toMap(row -> (Long) row[0], row -> (Long) row[1]));
+
         List<CardSummaryResponse> backlog = cards.stream()
                 .filter(c -> c.getStatus() == CardStatus.BACKLOG)
-                .map(CardSummaryResponse::from)
+                .map(c -> CardSummaryResponse.from(c, commentCounts.getOrDefault(c.getId(), 0L)))
                 .toList();
 
         List<CardSummaryResponse> inProgress = cards.stream()
                 .filter(c -> c.getStatus() == CardStatus.IN_PROGRESS)
-                .map(CardSummaryResponse::from)
+                .map(c -> CardSummaryResponse.from(c, commentCounts.getOrDefault(c.getId(), 0L)))
                 .toList();
 
         List<CardSummaryResponse> done = cards.stream()
                 .filter(c -> c.getStatus() == CardStatus.DONE)
-                .map(CardSummaryResponse::from)
+                .map(c -> CardSummaryResponse.from(c, commentCounts.getOrDefault(c.getId(), 0L)))
                 .toList();
 
         return new BoardResponse(backlog, inProgress, done);
@@ -82,6 +91,7 @@ public class CardService {
         card.update(request.title(), request.dueDate(), request.memo());
 
         card.getAssignees().clear();
+        cardAssigneeRepository.flush();
         saveAssignees(card, request.assigneeIds());
 
         List<CommitLogResponse> commitLogs = commitLogRepository.findAllByCardId(cardId)
@@ -103,15 +113,34 @@ public class CardService {
         card.delete();
     }
 
+    @Transactional
+    public BranchResponse addBranch(Long projectId, Long cardId, Long userId, CardBranchRequest request) {
+        validateProjectMember(projectId, userId);
+        Card card = findCardInProject(projectId, cardId);
+
+        CardBranch branch = new CardBranch(card, request.branchName(), request.repoName());
+        cardBranchRepository.save(branch);
+
+        return BranchResponse.from(branch);
+    }
+
+    @Transactional
+    public void removeBranch(Long projectId, Long cardId, Long userId, String branchName) {
+        validateProjectMember(projectId, userId);
+        findCardInProject(projectId, cardId);
+
+        CardBranchId id = new CardBranchId(cardId, branchName);
+        if (!cardBranchRepository.existsById(id)) {
+            throw new CustomException(ErrorCode.BRANCH_NOT_FOUND);
+        }
+        cardBranchRepository.deleteById(id);
+    }
+
     private void saveAssignees(Card card, List<Long> assigneeIds) {
         if (assigneeIds == null || assigneeIds.isEmpty()) return;
 
         List<User> users = userRepository.findAllById(assigneeIds);
-        users.forEach(user -> {
-            CardAssignee assignee = new CardAssignee(card, user);
-            cardAssigneeRepository.save(assignee);
-            card.getAssignees().add(assignee);
-        });
+        users.forEach(user -> card.getAssignees().add(new CardAssignee(card, user)));
     }
 
     private Card findCardInProject(Long projectId, Long cardId) {

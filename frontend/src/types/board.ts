@@ -23,6 +23,7 @@ export interface CardSummary {
   status: CardStatus
   dueDate: string | null
   assignees: Assignee[]
+  commentCount: number
 }
 
 export interface CardDetail {

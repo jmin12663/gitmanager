@@ -49,9 +49,6 @@ public class WebhookPayload {
     public static class PullRequest {
         public boolean merged;
 
-        @JsonProperty("merge_commit_sha")
-        public String mergeCommitSha;
-
         public Head head;
         public Base base;
     }

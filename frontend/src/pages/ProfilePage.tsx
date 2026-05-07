@@ -44,7 +44,7 @@ export default function ProfilePage() {
       .catch(() => setLoadError('사용자 정보를 불러오지 못했습니다.'))
   }, [])
 
-  async function handleNameSave(e: React.FormEvent) {
+  async function handleNameSave(e: React.SyntheticEvent) {
     e.preventDefault()
     if (!name.trim()) { setNameMsg({ type: 'err', text: '이름을 입력하세요.' }); return }
     setNameLoading(true)
@@ -80,7 +80,7 @@ export default function ProfilePage() {
     }
   }
 
-  async function handleLoginIdSave(e: React.FormEvent) {
+  async function handleLoginIdSave(e: React.SyntheticEvent) {
     e.preventDefault()
     if (!loginIdChecked) { setLoginIdMsg({ type: 'err', text: '중복 확인을 먼저 해주세요.' }); return }
     setLoginIdSaveLoading(true)
@@ -99,7 +99,7 @@ export default function ProfilePage() {
     }
   }
 
-  async function handlePasswordChange(e: React.FormEvent) {
+  async function handlePasswordChange(e: React.SyntheticEvent) {
     e.preventDefault()
     if (newPassword !== confirmPassword) {
       setPwMsg({ type: 'err', text: '새 비밀번호가 일치하지 않습니다.' })

@@ -27,13 +27,13 @@ public class RefreshToken {
     private String tokenHash;
 
     @Column(nullable = false)
-    private boolean isUsed = false;
+    private final boolean isUsed = false;
 
     @Column(nullable = false)
     private LocalDateTime expiresAt;
 
     @Column(nullable = false, updatable = false)
-    private LocalDateTime createdAt = LocalDateTime.now();
+    private final LocalDateTime createdAt = LocalDateTime.now();
 
     @Builder
     private RefreshToken(User user, String tokenHash, LocalDateTime expiresAt) {
