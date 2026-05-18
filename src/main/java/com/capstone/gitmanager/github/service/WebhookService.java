@@ -1,9 +1,13 @@
 package com.capstone.gitmanager.github.service;
 
+import com.capstone.gitmanager.board.dto.BoardEventMessage;
+import com.capstone.gitmanager.board.dto.CardSummaryResponse;
 import com.capstone.gitmanager.board.entity.*;
 import com.capstone.gitmanager.board.repository.CardBranchRepository;
 import com.capstone.gitmanager.board.repository.CardRepository;
+import com.capstone.gitmanager.board.repository.CommentRepository;
 import com.capstone.gitmanager.board.repository.CommitLogRepository;
+import com.capstone.gitmanager.board.service.BoardWebSocketService;
 import com.capstone.gitmanager.common.exception.CustomException;
 import com.capstone.gitmanager.common.exception.ErrorCode;
 import com.capstone.gitmanager.github.dto.WebhookPayload;
@@ -13,6 +17,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -31,6 +37,8 @@ public class WebhookService {
     private final CardRepository cardRepository;
     private final CardBranchRepository cardBranchRepository;
     private final CommitLogRepository commitLogRepository;
+    private final CommentRepository commentRepository;
+    private final BoardWebSocketService boardWsService;
 
     public ProjectGithub verifySignature(String repoName, String signature, String payload) {
         ProjectGithub github = projectGithubRepository.findByRepoName(repoName)
@@ -67,6 +75,9 @@ public class WebhookService {
 
         CardBranch branch = new CardBranch(card, branchName, repoName);
         cardBranchRepository.save(branch);
+
+        CardSummaryResponse summary = CardSummaryResponse.from(card, 0L);
+        broadcastAfterCommit(github.getProjectId(), new BoardEventMessage(BoardEventMessage.CARD_CREATED, card.getId(), summary, null));
     }
 
     @Transactional
@@ -79,9 +90,10 @@ public class WebhookService {
         cardBranchRepository.findByRepoNameAndIdBranchName(repoName, branchName)
                 .ifPresent(cardBranch -> {
                     Card card = cardBranch.getCard();
-                    // 진입점 A(카드 먼저 생성) 대응: BACKLOG 상태일 때만 IN_PROGRESS로 전환
+                    boolean statusChanged = false;
                     if (card.getStatus() == CardStatus.BACKLOG) {
                         card.changeStatus(CardStatus.IN_PROGRESS);
+                        statusChanged = true;
                     }
 
                     payload.commits.forEach(commit -> {
@@ -97,6 +109,12 @@ public class WebhookService {
                                 .build();
                         commitLogRepository.save(log);
                     });
+
+                    if (statusChanged) {
+                        long count = commentRepository.countByCardId(card.getId());
+                        CardSummaryResponse summary = CardSummaryResponse.from(card, count);
+                        broadcastAfterCommit(card.getProjectId(), new BoardEventMessage(BoardEventMessage.CARD_STATUS_CHANGED, card.getId(), summary, null));
+                    }
                 });
     }
 
@@ -112,6 +130,26 @@ public class WebhookService {
     }
 
     @Transactional
+    public void handlePullRequestReview(WebhookPayload payload) {
+        if (payload.pullRequest == null || payload.review == null
+                || payload.pullRequest.head == null) return;
+
+        String branchName = payload.pullRequest.head.ref;
+        String repoName = payload.repository.name;
+        String reviewState = payload.review.state;
+        String reviewer = payload.review.user != null ? payload.review.user.login : "unknown";
+
+        log.info("[Webhook] PR review 수신. branch={}, reviewer={}, state={}", branchName, reviewer, reviewState);
+
+        cardBranchRepository.findByRepoNameAndIdBranchName(repoName, branchName)
+                .ifPresent(cardBranch -> {
+                    Long cardId = cardBranch.getCard().getId();
+                    Long projectId = cardBranch.getCard().getProjectId();
+                    broadcastAfterCommit(projectId, new BoardEventMessage(BoardEventMessage.PR_REVIEW_UPDATED, cardId, null, null));
+                });
+    }
+
+    @Transactional
     public void handlePullRequest(WebhookPayload payload) {
         if (payload.pullRequest == null || !payload.pullRequest.merged) return;
 
@@ -123,7 +161,23 @@ public class WebhookService {
         String repoName = payload.repository.name;
 
         cardBranchRepository.findByRepoNameAndIdBranchName(repoName, branchName)
-                .ifPresent(cardBranch -> cardBranch.getCard().markMerged(LocalDateTime.now()));
+                .ifPresent(cardBranch -> {
+                    Card card = cardBranch.getCard();
+                    card.markMerged(LocalDateTime.now());
+
+                    long count = commentRepository.countByCardId(card.getId());
+                    CardSummaryResponse summary = CardSummaryResponse.from(card, count);
+                    broadcastAfterCommit(card.getProjectId(), new BoardEventMessage(BoardEventMessage.CARD_STATUS_CHANGED, card.getId(), summary, null));
+                });
+    }
+
+    private void broadcastAfterCommit(Long projectId, BoardEventMessage message) {
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                boardWsService.broadcast(projectId, message);
+            }
+        });
     }
 
     private String extractBranchName(String ref) {

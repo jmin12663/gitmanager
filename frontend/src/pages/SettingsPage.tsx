@@ -83,20 +83,20 @@ function GithubForm({ projectId, existing, onCancel }: GithubFormProps) {
         />
       </div>
       {error && <div className="auth-error" style={{ textAlign: 'left', marginBottom: 10 }}>{error}</div>}
-      <div style={{ display: 'flex', gap: 8 }}>
+      <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+        {onCancel && (
+          <button type="button" className="topbar-btn" onClick={onCancel} style={{ fontSize: 13, padding: '8px 16px' }}>
+            취소
+          </button>
+        )}
         <button
           type="submit"
           disabled={loading}
           className="topbar-btn accent"
           style={{ fontSize: 13, padding: '8px 16px' }}
         >
-          {loading ? '연결 중...' : 'GitHub으로 연동'}
+          {loading ? '연결 중...' : 'GitHub 연결'}
         </button>
-        {onCancel && (
-          <button type="button" className="topbar-btn" onClick={onCancel} style={{ fontSize: 13, padding: '8px 16px' }}>
-            취소
-          </button>
-        )}
       </div>
     </form>
   )

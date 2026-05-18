@@ -5,6 +5,8 @@ import com.capstone.gitmanager.auth.repository.UserRepository;
 import com.capstone.gitmanager.board.dto.*;
 import com.capstone.gitmanager.board.entity.*;
 import com.capstone.gitmanager.board.repository.*;
+import com.capstone.gitmanager.calendar.entity.Schedule;
+import com.capstone.gitmanager.calendar.repository.ScheduleRepository;
 import com.capstone.gitmanager.common.exception.CustomException;
 import com.capstone.gitmanager.common.exception.ErrorCode;
 import com.capstone.gitmanager.project.entity.UserProjectId;
@@ -12,6 +14,8 @@ import com.capstone.gitmanager.project.repository.UserProjectRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.List;
 import java.util.Map;
@@ -30,6 +34,8 @@ public class CardService {
     private final CommentRepository commentRepository;
     private final UserRepository userRepository;
     private final UserProjectRepository userProjectRepository;
+    private final ScheduleRepository scheduleRepository;
+    private final BoardWebSocketService boardWsService;
 
     public BoardResponse getBoard(Long projectId, Long userId) {
         validateProjectMember(projectId, userId);
@@ -78,7 +84,22 @@ public class CardService {
                 .build();
         cardRepository.save(card);
 
+        if (request.dueDate() != null) {
+            Schedule schedule = Schedule.builder()
+                    .projectId(projectId)
+                    .title("[카드] " + card.getTitle())
+                    .startDate(request.dueDate())
+                    .endDate(request.dueDate())
+                    .createdBy(userId)
+                    .build();
+            scheduleRepository.save(schedule);
+            card.linkSchedule(schedule.getId());
+        }
+
         saveAssignees(card, request.assigneeIds());
+
+        CardSummaryResponse summary = CardSummaryResponse.from(card, 0L);
+        broadcastAfterCommit(projectId, new BoardEventMessage(BoardEventMessage.CARD_CREATED, card.getId(), summary, null));
 
         return CardResponse.from(card, List.of());
     }
@@ -90,12 +111,39 @@ public class CardService {
 
         card.update(request.title(), request.dueDate(), request.memo());
 
+        Long linkedScheduleId = card.getLinkedScheduleId();
+        if (request.dueDate() != null) {
+            if (linkedScheduleId != null) {
+                scheduleRepository.findById(linkedScheduleId).ifPresent(s ->
+                        s.update("[카드] " + request.title(), request.dueDate(), request.dueDate())
+                );
+            } else {
+                Schedule s = Schedule.builder()
+                        .projectId(projectId)
+                        .title("[카드] " + request.title())
+                        .startDate(request.dueDate())
+                        .endDate(request.dueDate())
+                        .createdBy(userId)
+                        .build();
+                scheduleRepository.save(s);
+                card.linkSchedule(s.getId());
+            }
+        } else if (linkedScheduleId != null) {
+            scheduleRepository.findById(linkedScheduleId).ifPresent(scheduleRepository::delete);
+            card.unlinkSchedule();
+        }
+
         card.getAssignees().clear();
         cardAssigneeRepository.flush();
         saveAssignees(card, request.assigneeIds());
 
         List<CommitLogResponse> commitLogs = commitLogRepository.findAllByCardId(cardId)
                 .stream().map(CommitLogResponse::from).toList();
+
+        long count = commentRepository.countByCardId(cardId);
+        CardSummaryResponse summary = CardSummaryResponse.from(card, count);
+        broadcastAfterCommit(projectId, new BoardEventMessage(BoardEventMessage.CARD_UPDATED, cardId, summary, null));
+
         return CardResponse.from(card, commitLogs);
     }
 
@@ -104,13 +152,23 @@ public class CardService {
         validateProjectMember(projectId, userId);
         Card card = findCardInProject(projectId, cardId);
         card.changeStatus(request.status());
+
+        long count = commentRepository.countByCardId(cardId);
+        CardSummaryResponse summary = CardSummaryResponse.from(card, count);
+        broadcastAfterCommit(projectId, new BoardEventMessage(BoardEventMessage.CARD_STATUS_CHANGED, cardId, summary, null));
     }
 
     @Transactional
     public void deleteCard(Long projectId, Long userId, Long cardId) {
         validateProjectMember(projectId, userId);
         Card card = findCardInProject(projectId, cardId);
+        if (card.getLinkedScheduleId() != null) {
+            scheduleRepository.findById(card.getLinkedScheduleId())
+                    .ifPresent(scheduleRepository::delete);
+        }
         card.delete();
+
+        broadcastAfterCommit(projectId, new BoardEventMessage(BoardEventMessage.CARD_DELETED, cardId, null, null));
     }
 
     @Transactional
@@ -134,6 +192,15 @@ public class CardService {
             throw new CustomException(ErrorCode.BRANCH_NOT_FOUND);
         }
         cardBranchRepository.deleteById(id);
+    }
+
+    private void broadcastAfterCommit(Long projectId, BoardEventMessage message) {
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                boardWsService.broadcast(projectId, message);
+            }
+        });
     }
 
     private void saveAssignees(Card card, List<Long> assigneeIds) {

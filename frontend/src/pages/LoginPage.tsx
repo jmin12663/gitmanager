@@ -59,10 +59,7 @@ export default function LoginPage() {
       <div className="auth-grid" />
       <div className="auth-card">
         <div className="auth-logo">
-          <div className="auth-logo-icon">
-            <GithubIcon />
-          </div>
-          <span className="auth-logo-name">GitManager</span>
+          <span className="auth-logo-name">DevFlow</span>
         </div>
 
         <div className="auth-title">다시 오셨군요</div>

@@ -45,6 +45,9 @@ public class WebhookPayload {
         public String name;
     }
 
+    // pull_request_review 이벤트
+    public Review review;
+
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class PullRequest {
         public boolean merged;
@@ -61,5 +64,16 @@ public class WebhookPayload {
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class Base {
         public String ref;
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class Review {
+        public String state;
+        public ReviewUser user;
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class ReviewUser {
+        public String login;
     }
 }

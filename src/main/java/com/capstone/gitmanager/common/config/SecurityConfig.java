@@ -48,7 +48,8 @@ public class SecurityConfig {
                                 "/api/auth/logout",           // 로그아웃
                                 "/api/auth/refresh",          // 토큰 재발급
                                 "/api/webhook/**",            // GitHub Webhook
-                                "/api/github/oauth/callback"  // GitHub OAuth 콜백 (GitHub이 직접 호출)
+                                "/api/github/oauth/callback", // GitHub OAuth 콜백 (GitHub이 직접 호출)
+                                "/ws/**"                      // WebSocket 핸드셰이크 (JWT는 STOMP CONNECT에서 검증)
                         ).permitAll()
                         .requestMatchers(
                                 "/",

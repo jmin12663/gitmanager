@@ -1,0 +1,232 @@
+package com.capstone.gitmanager.github.service;
+
+import com.capstone.gitmanager.board.entity.Card;
+import com.capstone.gitmanager.board.repository.CardRepository;
+import com.capstone.gitmanager.common.exception.CustomException;
+import com.capstone.gitmanager.common.exception.ErrorCode;
+import com.capstone.gitmanager.github.dto.CreatePrCommentRequest;
+import com.capstone.gitmanager.github.dto.PullFileResponse;
+import com.capstone.gitmanager.github.dto.PullRequestResponse;
+import com.capstone.gitmanager.github.entity.ProjectGithub;
+import com.capstone.gitmanager.github.repository.ProjectGithubRepository;
+import com.capstone.gitmanager.project.entity.UserProjectId;
+import com.capstone.gitmanager.project.repository.UserProjectRepository;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.jasypt.encryption.StringEncryptor;
+import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.RestClient;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
+@Slf4j
+@Service
+@RequiredArgsConstructor
+@Transactional(readOnly = true)
+public class PullRequestService {
+
+    private final ProjectGithubRepository projectGithubRepository;
+    private final CardRepository cardRepository;
+    private final UserProjectRepository userProjectRepository;
+    private final StringEncryptor jasyptStringEncryptor;
+
+    private final RestClient restClient = RestClient.create();
+
+    public List<PullRequestResponse> getCardPulls(Long projectId, Long cardId, Long userId) {
+        validateMember(projectId, userId);
+
+        ProjectGithub github = projectGithubRepository.findById(projectId)
+                .orElseThrow(() -> new CustomException(ErrorCode.GITHUB_NOT_CONFIGURED));
+
+        Card card = cardRepository.findById(cardId)
+                .orElseThrow(() -> new CustomException(ErrorCode.CARD_NOT_FOUND));
+
+        if (!card.getProjectId().equals(projectId)) {
+            throw new CustomException(ErrorCode.FORBIDDEN);
+        }
+
+        String accessToken = jasyptStringEncryptor.decrypt(github.getOauthTokenEncrypted());
+        String owner = parseRepoOwner(github.getRepoUrl());
+        String repoName = github.getRepoName();
+
+        List<PullRequestResponse> result = new ArrayList<>();
+        for (var branch : card.getBranches()) {
+            String branchName = branch.getBranchName();
+            List<Map<String, Object>> prs = fetchPullsForBranch(owner, repoName, branchName, accessToken);
+            for (Map<String, Object> pr : prs) {
+                int prNumber = ((Number) pr.get("number")).intValue();
+                List<Map<String, Object>> reviews = fetchReviews(owner, repoName, prNumber, accessToken);
+                result.add(PullRequestResponse.from(pr, reviews));
+            }
+        }
+        return result;
+    }
+
+    public List<PullRequestResponse> getProjectPulls(Long projectId, Long userId, String state) {
+        validateMember(projectId, userId);
+
+        ProjectGithub github = projectGithubRepository.findById(projectId)
+                .orElseThrow(() -> new CustomException(ErrorCode.GITHUB_NOT_CONFIGURED));
+
+        String accessToken = jasyptStringEncryptor.decrypt(github.getOauthTokenEncrypted());
+        String owner = parseRepoOwner(github.getRepoUrl());
+        String repoName = github.getRepoName();
+
+        String ghState = ("merged".equals(state) || "closed".equals(state)) ? "closed" : "open";
+        if ("all".equals(state)) ghState = "all";
+
+        List<Map<String, Object>> prs = fetchPulls(owner, repoName, ghState, accessToken);
+
+        return prs.stream()
+                .map(pr -> {
+                    int prNumber = ((Number) pr.get("number")).intValue();
+                    List<Map<String, Object>> reviews = fetchReviews(owner, repoName, prNumber, accessToken);
+                    return PullRequestResponse.from(pr, reviews);
+                })
+                .filter(pr -> filterByState(pr, state))
+                .toList();
+    }
+
+    public void createPrComment(Long projectId, int prNumber, CreatePrCommentRequest request, Long userId) {
+        validateMember(projectId, userId);
+
+        ProjectGithub github = projectGithubRepository.findById(projectId)
+                .orElseThrow(() -> new CustomException(ErrorCode.GITHUB_NOT_CONFIGURED));
+
+        String accessToken = jasyptStringEncryptor.decrypt(github.getOauthTokenEncrypted());
+        String owner = parseRepoOwner(github.getRepoUrl());
+        String repoName = github.getRepoName();
+
+        Map<String, Object> body = Map.of(
+                "body", request.body(),
+                "commit_id", request.commitId(),
+                "path", request.path(),
+                "line", request.line(),
+                "side", request.side()
+        );
+
+        try {
+            restClient.post()
+                    .uri("https://api.github.com/repos/{owner}/{repo}/pulls/{prNumber}/comments",
+                            owner, repoName, prNumber)
+                    .header("Authorization", "Bearer " + accessToken)
+                    .header("Accept", "application/vnd.github+json")
+                    .body(body)
+                    .retrieve()
+                    .toBodilessEntity();
+        } catch (Exception e) {
+            log.warn("[PR] 라인 코멘트 등록 실패. prNumber={}, path={}, line={}, error={}",
+                    prNumber, request.path(), request.line(), e.getMessage());
+            throw new CustomException(ErrorCode.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    public List<PullFileResponse> getPullFiles(Long projectId, int prNumber, Long userId) {
+        validateMember(projectId, userId);
+
+        ProjectGithub github = projectGithubRepository.findById(projectId)
+                .orElseThrow(() -> new CustomException(ErrorCode.GITHUB_NOT_CONFIGURED));
+
+        String accessToken = jasyptStringEncryptor.decrypt(github.getOauthTokenEncrypted());
+        String owner = parseRepoOwner(github.getRepoUrl());
+        String repoName = github.getRepoName();
+
+        return fetchPullFiles(owner, repoName, prNumber, accessToken);
+    }
+
+    private boolean filterByState(PullRequestResponse pr, String state) {
+        if (state == null || "all".equals(state)) return true;
+        return switch (state) {
+            case "open"   -> "OPEN".equals(pr.state());
+            case "draft"  -> "DRAFT".equals(pr.state());
+            case "merged" -> "MERGED".equals(pr.state());
+            case "closed" -> "CLOSED".equals(pr.state());
+            default       -> true;
+        };
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<Map<String, Object>> fetchPullsForBranch(String owner, String repo, String branch, String token) {
+        try {
+            String headParam = owner + ":" + branch;
+            List<Map<String, Object>> res = restClient.get()
+                    .uri("https://api.github.com/repos/{owner}/{repo}/pulls?head={head}&state=all&per_page=10",
+                            owner, repo, headParam)
+                    .header("Authorization", "Bearer " + token)
+                    .header("Accept", "application/vnd.github+json")
+                    .retrieve()
+                    .body(new ParameterizedTypeReference<>() {});
+            return res != null ? res : List.of();
+        } catch (Exception e) {
+            log.warn("[PR] 브랜치 PR 조회 실패. branch={}, error={}", branch, e.getMessage());
+            return List.of();
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<Map<String, Object>> fetchPulls(String owner, String repo, String state, String token) {
+        try {
+            List<Map<String, Object>> res = restClient.get()
+                    .uri("https://api.github.com/repos/{owner}/{repo}/pulls?state={state}&per_page=50",
+                            owner, repo, state)
+                    .header("Authorization", "Bearer " + token)
+                    .header("Accept", "application/vnd.github+json")
+                    .retrieve()
+                    .body(new ParameterizedTypeReference<>() {});
+            return res != null ? res : List.of();
+        } catch (Exception e) {
+            log.warn("[PR] 프로젝트 PR 목록 조회 실패. error={}", e.getMessage());
+            return List.of();
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<PullFileResponse> fetchPullFiles(String owner, String repo, int prNumber, String token) {
+        try {
+            List<Map<String, Object>> res = restClient.get()
+                    .uri("https://api.github.com/repos/{owner}/{repo}/pulls/{prNumber}/files?per_page=100",
+                            owner, repo, prNumber)
+                    .header("Authorization", "Bearer " + token)
+                    .header("Accept", "application/vnd.github+json")
+                    .retrieve()
+                    .body(new ParameterizedTypeReference<>() {});
+            if (res == null) return List.of();
+            return res.stream().map(PullFileResponse::from).toList();
+        } catch (Exception e) {
+            log.warn("[PR] 파일 목록 조회 실패. prNumber={}, error={}", prNumber, e.getMessage());
+            return List.of();
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<Map<String, Object>> fetchReviews(String owner, String repo, int prNumber, String token) {
+        try {
+            List<Map<String, Object>> res = restClient.get()
+                    .uri("https://api.github.com/repos/{owner}/{repo}/pulls/{prNumber}/reviews",
+                            owner, repo, prNumber)
+                    .header("Authorization", "Bearer " + token)
+                    .header("Accept", "application/vnd.github+json")
+                    .retrieve()
+                    .body(new ParameterizedTypeReference<>() {});
+            return res != null ? res : List.of();
+        } catch (Exception e) {
+            log.warn("[PR] 리뷰 조회 실패. prNumber={}, error={}", prNumber, e.getMessage());
+            return List.of();
+        }
+    }
+
+    private String parseRepoOwner(String repoUrl) {
+        String[] parts = repoUrl.replaceAll("/$", "").split("/");
+        return parts[parts.length - 2];
+    }
+
+    private void validateMember(Long projectId, Long userId) {
+        if (!userProjectRepository.existsById(new UserProjectId(userId, projectId))) {
+            throw new CustomException(ErrorCode.FORBIDDEN);
+        }
+    }
+}

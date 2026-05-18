@@ -49,6 +49,9 @@ public class Card extends BaseEntity {
 
     private LocalDateTime mergedAt;
 
+    @Column(name = "linked_schedule_id")
+    private Long linkedScheduleId;
+
     @OneToMany(mappedBy = "card", cascade = CascadeType.ALL, orphanRemoval = true)
     private final Set<CardAssignee> assignees = new HashSet<>();
 
@@ -68,6 +71,18 @@ public class Card extends BaseEntity {
         this.title = title;
         this.dueDate = dueDate;
         this.memo = memo;
+    }
+
+    public void linkSchedule(Long scheduleId) {
+        this.linkedScheduleId = scheduleId;
+    }
+
+    public void unlinkSchedule() {
+        this.linkedScheduleId = null;
+    }
+
+    public void updateDueDate(LocalDate dueDate) {
+        this.dueDate = dueDate;
     }
 
     public void changeStatus(CardStatus status) {

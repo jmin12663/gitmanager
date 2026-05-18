@@ -2,13 +2,33 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { registerApi, sendEmailCodeApi, verifyEmailCodeApi } from '@/api/auth'
 
-const GithubIcon = () => (
-  <svg viewBox="0 0 16 16">
-    <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z" />
-  </svg>
-)
-
 const OTP_LENGTH = 6
+
+interface HintCondition {
+  label: string
+  met: boolean
+}
+
+function FieldHint({ conditions, touched }: { conditions: HintCondition[]; touched: boolean }) {
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 10px', marginTop: 6 }}>
+      {conditions.map(c => (
+        <span
+          key={c.label}
+          style={{
+            fontSize: 11,
+            color: touched && c.met ? '#10b981' : touched && !c.met ? 'var(--gm-red, #ef4444)' : 'var(--gm-text3)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 3,
+          }}
+        >
+          {touched ? (c.met ? '✓' : '✗') : '·'} {c.label}
+        </span>
+      ))}
+    </div>
+  )
+}
 
 export default function RegisterPage() {
   const navigate = useNavigate()
@@ -135,8 +155,7 @@ export default function RegisterPage() {
       <div className="auth-grid" />
       <div className="auth-card">
         <div className="auth-logo">
-          <div className="auth-logo-icon"><GithubIcon /></div>
-          <span className="auth-logo-name">GitManager</span>
+          <span className="auth-logo-name">DevFlow</span>
         </div>
 
         <div className="auth-title">계정 만들기</div>
@@ -152,16 +171,23 @@ export default function RegisterPage() {
               onChange={e => setName(e.target.value)}
               required
             />
+            <FieldHint conditions={[
+              { label: '필수 입력', met: name.trim().length > 0 },
+            ]} touched={name.length > 0} />
           </div>
           <div className="auth-field">
             <label>아이디</label>
             <input
               type="text"
-              placeholder="5~20자, 영문·숫자"
+              placeholder="영문·숫자 조합"
               value={loginId}
               onChange={e => setLoginId(e.target.value)}
               required
             />
+            <FieldHint conditions={[
+              { label: '5~20자', met: loginId.length >= 5 && loginId.length <= 20 },
+              { label: '영문·숫자만 허용', met: /^[a-zA-Z0-9]+$/.test(loginId) },
+            ]} touched={loginId.length > 0} />
           </div>
 
           <div className="auth-field">
@@ -185,6 +211,10 @@ export default function RegisterPage() {
                 {sendLoading ? '전송 중...' : codeSent ? '재전송' : '인증코드 전송'}
               </button>
             </div>
+            <FieldHint conditions={[
+              { label: '올바른 이메일 형식', met: /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) },
+              { label: '이메일 인증 완료', met: emailVerified },
+            ]} touched={email.length > 0} />
           </div>
 
           {codeSent && !emailVerified && (
@@ -222,12 +252,6 @@ export default function RegisterPage() {
             </div>
           )}
 
-          {emailVerified && (
-            <div style={{ marginBottom: 16, fontSize: 13, color: 'var(--gm-accent)', display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span>✓</span> 이메일 인증 완료
-            </div>
-          )}
-
           <div className="auth-field">
             <label>비밀번호</label>
             <input
@@ -237,6 +261,9 @@ export default function RegisterPage() {
               onChange={e => setPassword(e.target.value)}
               required
             />
+            <FieldHint conditions={[
+              { label: '8자 이상', met: password.length >= 8 },
+            ]} touched={password.length > 0} />
           </div>
 
           {error && <div className="auth-error">{error}</div>}

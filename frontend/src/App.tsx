@@ -10,6 +10,7 @@ import DashboardPage from '@/pages/DashboardPage'
 import SettingsPage from '@/pages/SettingsPage'
 import TodoPage from '@/pages/TodoPage'
 import ProfilePage from '@/pages/ProfilePage'
+import PullRequestsPage from '@/pages/PullRequestsPage'
 
 export default function App() {
   return (
@@ -29,6 +30,7 @@ export default function App() {
             <Route path="/projects/:projectId/calendar" element={<CalendarPage />} />
             <Route path="/projects/:projectId/dashboard" element={<DashboardPage />} />
             <Route path="/projects/:projectId/settings" element={<SettingsPage />} />
+            <Route path="/projects/:projectId/pulls" element={<PullRequestsPage />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/login" replace />} />

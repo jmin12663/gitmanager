@@ -29,9 +29,6 @@ export const sendEmailCodeApi = (email: string) =>
 export const verifyEmailCodeApi = (data: VerifyEmailPayload) =>
   client.post('/auth/verify-email-code', data)
 
-export const verifyEmailApi = (data: VerifyEmailPayload) =>
-  client.post('/auth/verify-email', data)
-
 export const getMeApi = () =>
   client.get('/auth/me')
 

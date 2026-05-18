@@ -11,11 +11,6 @@ import type { Project } from '@/types/project'
 
 const PROJ_COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#3b82f6']
 
-const GithubIcon = () => (
-  <svg viewBox="0 0 16 16">
-    <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z" />
-  </svg>
-)
 
 const TodoIcon = () => (
   <svg viewBox="0 0 16 16" fill="currentColor"><path d="M2 3h12v2H2zm0 4h12v2H2zm0 4h7v2H2z" /></svg>
@@ -36,6 +31,12 @@ const CalendarIcon = () => (
   </svg>
 )
 
+const PullRequestIcon = () => (
+  <svg viewBox="0 0 16 16" fill="currentColor">
+    <path d="M1.5 3.25a2.25 2.25 0 113 2.122v5.256a2.251 2.251 0 11-1.5 0V5.372A2.25 2.25 0 011.5 3.25zm5.677-.177L9.573.677A.25.25 0 0110 .854V2.5h1A2.5 2.5 0 0113.5 5v5.628a2.251 2.251 0 11-1.5 0V5a1 1 0 00-1-1h-1v1.646a.25.25 0 01-.427.177L7.177 3.427a.25.25 0 010-.354zM3.75 2.5a.75.75 0 100 1.5.75.75 0 000-1.5zm0 9.5a.75.75 0 100 1.5.75.75 0 000-1.5zm8.25.75a.75.75 0 101.5 0 .75.75 0 00-1.5 0z" />
+  </svg>
+)
+
 const SettingsIcon = () => (
   <svg viewBox="0 0 16 16" fill="currentColor">
     <path d="M9.405 1.05c-.413-1.4-2.397-1.4-2.81 0l-.1.34a1.464 1.464 0 01-2.105.872l-.31-.17c-1.283-.698-2.686.705-1.987 1.987l.169.311c.446.82.023 1.841-.872 2.105l-.34.1c-1.4.413-1.4 2.397 0 2.81l.34.1a1.464 1.464 0 01.872 2.105l-.17.31c-.698 1.283.705 2.686 1.987 1.987l.311-.169a1.464 1.464 0 012.105.872l.1.34c.413 1.4 2.397 1.4 2.81 0l.1-.34a1.464 1.464 0 012.105-.872l.31.17c1.283.698 2.686-.705 1.987-1.987l-.169-.311a1.464 1.464 0 01.872-2.105l.34-.1c1.4-.413 1.4-2.397 0-2.81l-.34-.1a1.464 1.464 0 01-.872-2.105l.17-.31c.698-1.283-.705-2.686-1.987-1.987l-.311.169a1.464 1.464 0 01-2.105-.872l-.1-.34zM8 10.93a2.929 2.929 0 110-5.86 2.929 2.929 0 010 5.858z" />
@@ -52,6 +53,7 @@ const PAGE_LABELS: Record<string, string> = {
   board: 'Board',
   dashboard: '대시보드',
   calendar: '캘린더',
+  pulls: 'Pull Requests',
   settings: '설정',
   profile: '개인정보 설정',
 }
@@ -60,6 +62,7 @@ function currentPage(pathname: string): string {
   if (pathname.endsWith('/board')) return 'board'
   if (pathname.endsWith('/dashboard')) return 'dashboard'
   if (pathname.endsWith('/calendar')) return 'calendar'
+  if (pathname.endsWith('/pulls')) return 'pulls'
   if (pathname.endsWith('/settings')) return 'settings'
   if (pathname === '/todo') return 'todo'
   if (pathname === '/profile') return 'profile'
@@ -222,14 +225,20 @@ export default function AppLayout() {
       .then(res => {
         const list: Project[] = res.data.data
         setProjects(list)
-        if (currentProjectId) {
-          setOpenProjectIds(new Set([currentProjectId]))
-        } else if (list.length > 0) {
-          setOpenProjectIds(new Set([list[0].id]))
-        }
+        setOpenProjectIds(prev => {
+          if (prev.size > 0) return prev
+          if (list.length > 0) return new Set([list[0].id])
+          return prev
+        })
       })
       .catch(() => {})
-  }, [user, currentProjectId])
+  }, [user])
+
+  useEffect(() => {
+    if (currentProjectId) {
+      setOpenProjectIds(prev => new Set([...prev, currentProjectId]))
+    }
+  }, [currentProjectId])
 
   useEffect(() => {
     if (!user || !currentProjectId) {
@@ -308,10 +317,7 @@ export default function AppLayout() {
       {/* ── Sidebar ── */}
       <div className="sidebar">
         <div className="sidebar-header">
-          <div className="logo-mark">
-            <GithubIcon />
-          </div>
-          <span className="logo-text">GitManager</span>
+          <span className="logo-text">DevFlow</span>
         </div>
 
         <div className="sidebar-body">
@@ -366,6 +372,13 @@ export default function AppLayout() {
                   >
                     <CalendarIcon />
                     캘린더
+                  </Link>
+                  <Link
+                    to={`/projects/${proj.id}/pulls`}
+                    className={`sub-item${isCurrentProj && page === 'pulls' ? ' active' : ''}`}
+                  >
+                    <PullRequestIcon />
+                    Pull Requests
                   </Link>
                   {proj.myRole === 'OWNER' && (
                     <Link

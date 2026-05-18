@@ -1,5 +1,6 @@
 package com.capstone.gitmanager.calendar.service;
 
+import com.capstone.gitmanager.board.repository.CardRepository;
 import com.capstone.gitmanager.calendar.dto.ScheduleCreateRequest;
 import com.capstone.gitmanager.calendar.dto.ScheduleResponse;
 import com.capstone.gitmanager.calendar.dto.ScheduleUpdateRequest;
@@ -23,6 +24,7 @@ public class ScheduleService {
 
     private final ScheduleRepository scheduleRepository;
     private final UserProjectRepository userProjectRepository;
+    private final CardRepository cardRepository;
 
     public List<ScheduleResponse> getSchedules(Long projectId, Long userId, LocalDate from, LocalDate to) {
         validateProjectMember(projectId, userId);
@@ -53,6 +55,9 @@ public class ScheduleService {
 
         schedule.update(request.title(), request.startDate(), request.endDate());
 
+        cardRepository.findByLinkedScheduleId(scheduleId)
+                .ifPresent(card -> card.updateDueDate(request.startDate()));
+
         return ScheduleResponse.from(schedule);
     }
 
@@ -60,6 +65,11 @@ public class ScheduleService {
     public void deleteSchedule(Long projectId, Long userId, Long scheduleId) {
         validateProjectMember(projectId, userId);
         Schedule schedule = findScheduleInProject(projectId, scheduleId);
+        cardRepository.findByLinkedScheduleId(scheduleId)
+                .ifPresent(card -> {
+                    card.updateDueDate(null);
+                    card.unlinkSchedule();
+                });
         scheduleRepository.delete(schedule);
     }
 

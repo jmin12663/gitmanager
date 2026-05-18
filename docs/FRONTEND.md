@@ -23,10 +23,11 @@ frontend/src/
 │   └── AppLayout.tsx   # 사이드바 + topbar + <Outlet />
 ├── pages/         # LoginPage / RegisterPage / VerifyPage / ProfilePage
 │                  # TodoPage / BoardPage / CalendarPage / DashboardPage / SettingsPage
+│                  # PullRequestsPage
 ├── store/
 │   ├── authStore.ts    # AuthContext 타입 + useAuth 훅
 │   └── AuthProvider.tsx # 앱 시작 시 RT 쿠키로 세션 복구
-├── types/         # project.ts / board.ts / calendar.ts / dashboard.ts
+├── types/         # project.ts / board.ts / calendar.ts / dashboard.ts / pullrequest.ts
 ├── lib/
 │   └── theme.ts   # 다크/라이트 테마 토글
 ├── index.css      # --gm-* 변수 + 전체 커스텀 CSS
@@ -52,6 +53,7 @@ frontend/src/
     <Route path="/projects/:projectId/calendar" element={<CalendarPage />} />
     <Route path="/projects/:projectId/dashboard" element={<DashboardPage />} />
     <Route path="/projects/:projectId/settings" element={<SettingsPage />} />
+    <Route path="/projects/:projectId/pulls"   element={<PullRequestsPage />} />
   </Route>
 
   <Route path="*" element={<Navigate to="/login" replace />} />
@@ -74,6 +76,31 @@ frontend/src/
 
 - Access Token: 메모리 (`client.ts`의 `accessToken` 변수)
 - Refresh Token: httpOnly 쿠키
+
+---
+
+## API 파일 목록
+
+| 파일 | 주요 함수 |
+|------|----------|
+| `api/auth.ts` | login / register / sendEmailCode / verifyEmailCode / getMe / logout / updateProfile / checkLoginId / updateLoginId / changePassword |
+| `api/project.ts` | getMyProjects / createProject / joinProject / getProject / getProjectMembers / updateProject |
+| `api/todo.ts` | getTodos / createTodo / toggleTodo / deleteTodo |
+| `api/board.ts` | getBoard / createCard / getCard / updateCard / updateCardStatus / deleteCard / getComments / createComment / deleteComment / addBranch / removeBranch |
+| `api/calendar.ts` | getSchedules / createSchedule / updateSchedule / deleteSchedule |
+| `api/dashboard.ts` | getDashboard |
+| `api/settings.ts` | getInviteCode / regenerateInviteCode / getMembers / kickMember / leaveProject / deleteProject / getGithubConfig / getOAuthRedirectUrl |
+| `api/pullrequest.ts` | getCardPullsApi / getProjectPullsApi / getPullFilesApi / createPrCommentApi |
+
+---
+
+## PR 기능 구조 (GitHub API 프록시)
+
+PR 데이터는 DB에 저장하지 않고 GitHub API를 실시간 조회합니다.
+
+- `PullRequestsPage.tsx` — `/projects/:id/pulls` 라우트. Open/Draft/Merged/Closed 탭 필터, "코드 보기" diff 뷰어, 라인 코멘트
+- `BoardPage.tsx` — 카드 상세 모달에 PR 섹션 (브랜치 있을 때만 표시). `PR_REVIEW_UPDATED` WebSocket 이벤트 수신 시 자동 갱신
+- `AppLayout.tsx` — 사이드바에 Pull Requests 메뉴 (`currentPage('/pulls')` 감지)
 
 ---
 

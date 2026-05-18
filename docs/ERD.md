@@ -12,6 +12,9 @@
 - `project_github`: project_id가 PK이자 FK, GitHub OAuth access token은 Jasypt 암호화 (AES_SECRET_KEY)
 ```
 
+> **PR 기능 관련**: PR 데이터(PR 목록, reviewer, diff, 라인 코멘트)는 DB에 저장하지 않음.
+> GitHub API를 백엔드가 실시간 프록시하는 구조. 별도 테이블 없음.
+
 ---
 
 ## 테이블 관계 요약
@@ -117,22 +120,24 @@ CREATE TABLE project_github (
 -- status: BACKLOG / IN_PROGRESS / DONE
 -- is_deleted: Soft Delete (JPA @SQLRestriction 으로 자동 필터링)
 -- merged_at: main merge 시 기록
--- image_url: 미구현 (S3 업로드 추후 추가 예정)
+-- linked_schedule_id: due_date와 연동된 캘린더 일정 ID (양방향 자동 동기화)
 CREATE TABLE cards (
-    id         BIGINT        NOT NULL AUTO_INCREMENT,
-    project_id BIGINT        NOT NULL,
-    title      VARCHAR(255)  NOT NULL,
-    status     VARCHAR(20)   NOT NULL DEFAULT 'BACKLOG',
-    due_date   DATE,
-    memo       TEXT,
-    is_deleted BOOLEAN       NOT NULL DEFAULT FALSE,
-    created_by BIGINT        NOT NULL,
-    merged_at  DATETIME(6),
-    created_at DATETIME(6)   NOT NULL,
-    updated_at DATETIME(6)   NOT NULL,
+    id                  BIGINT        NOT NULL AUTO_INCREMENT,
+    project_id          BIGINT        NOT NULL,
+    title               VARCHAR(255)  NOT NULL,
+    status              VARCHAR(20)   NOT NULL DEFAULT 'BACKLOG',
+    due_date            DATE,
+    memo                TEXT,
+    is_deleted          BOOLEAN       NOT NULL DEFAULT FALSE,
+    created_by          BIGINT        NOT NULL,
+    merged_at           DATETIME(6),
+    linked_schedule_id  BIGINT,
+    created_at          DATETIME(6)   NOT NULL,
+    updated_at          DATETIME(6)   NOT NULL,
     PRIMARY KEY (id),
-    FOREIGN KEY (project_id) REFERENCES projects (id) ON DELETE CASCADE,
-    FOREIGN KEY (created_by) REFERENCES users    (id)
+    FOREIGN KEY (project_id)         REFERENCES projects  (id) ON DELETE CASCADE,
+    FOREIGN KEY (created_by)         REFERENCES users     (id),
+    FOREIGN KEY (linked_schedule_id) REFERENCES schedules (id) ON DELETE SET NULL
 );
 
 -- 카드 담당자 (다대다, 복합 PK)

@@ -18,10 +18,9 @@
 
 ---
 
-### 🟡 CardDetailModal 인라인 스타일 과다
-- **현상**: `CardDetailModal` 전체가 `style={{ ... }}` 인라인 스타일로 작성됨
-- **영향**: FRONTEND.md 규칙(신규 CSS는 `index.css`에 추가) 위반, 유지보수 어려움
-- **해결**: `index.css`에 `.card-detail-*` 클래스 추가 후 교체
+### ✅ CardDetailModal 인라인 스타일 정리 — 완료
+- `index.css`에 `.card-detail-*`, `.assignee-chip`, `.branch-tag`, `.card-footer-meta` 등 클래스 추가
+- `BoardPage.tsx`의 `style={{ ... }}` 인라인 스타일 전량 교체 (동적 avatar 색상만 유지)
 
 ---
 
@@ -146,10 +145,9 @@
 | 순위 | 항목 | 파일 | 난이도 |
 |------|------|------|--------|
 | 1 | 토스트 알림 도입 | 전역 | 중간 |
-| 2 | CardDetailModal 인라인 스타일 정리 | `BoardPage.tsx` + `index.css` | 중간 |
-| 3 | 비활성 GitHub 버튼 처리 | `LoginPage.tsx` | 낮음 |
-| 4 | shadcn 토큰 통합 | `index.css` | 중간 |
-| 5 | CSS 클래스 시맨틱 불일치 | 전역 | 중간 |
-| 6 | 로딩 스켈레톤 | `BoardPage.tsx`, `DashboardPage.tsx` | 중간 |
-| 7 | 완료 카드 mergedAt 표시 | `BoardPage.tsx` | 낮음 |
-| 8 | 브랜치 입력 UX 개선 | `BoardPage.tsx` | 낮음 |
+| 2 | 비활성 GitHub 버튼 처리 | `LoginPage.tsx` | 낮음 |
+| 3 | shadcn 토큰 통합 | `index.css` | 중간 |
+| 4 | CSS 클래스 시맨틱 불일치 | 전역 | 중간 |
+| 5 | 로딩 스켈레톤 | `BoardPage.tsx`, `DashboardPage.tsx` | 중간 |
+| 6 | 완료 카드 mergedAt 표시 | `BoardPage.tsx` | 낮음 |
+| 7 | 브랜치 입력 UX 개선 | `BoardPage.tsx` | 낮음 |

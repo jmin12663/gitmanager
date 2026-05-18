@@ -57,6 +57,9 @@ public class AuthService {
 
     @Transactional
     public void sendEmailCode(SendEmailCodeRequest request) {
+        if (userRepository.existsByEmail(request.email())) {
+            throw new CustomException(ErrorCode.EMAIL_ALREADY_EXISTS);
+        }
         preEmailVerificationRepository.deleteByEmail(request.email());
 
         String code = String.format("%06d", new SecureRandom().nextInt(1_000_000));
@@ -89,9 +92,6 @@ public class AuthService {
     public void register(RegisterRequest request) {
         if (userRepository.existsByLoginId(request.loginId())) {
             throw new CustomException(ErrorCode.LOGIN_ID_ALREADY_EXISTS);
-        }
-        if (userRepository.existsByEmail(request.email())) {
-            throw new CustomException(ErrorCode.EMAIL_ALREADY_EXISTS);
         }
 
         PreEmailVerification pre = preEmailVerificationRepository.findByEmail(request.email())

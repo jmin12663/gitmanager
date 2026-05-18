@@ -2,6 +2,7 @@ package com.capstone.gitmanager.board.service;
 
 import com.capstone.gitmanager.auth.entity.User;
 import com.capstone.gitmanager.auth.repository.UserRepository;
+import com.capstone.gitmanager.board.dto.BoardEventMessage;
 import com.capstone.gitmanager.board.dto.CommentCreateRequest;
 import com.capstone.gitmanager.board.dto.CommentResponse;
 import com.capstone.gitmanager.board.entity.Card;
@@ -15,6 +16,8 @@ import com.capstone.gitmanager.project.repository.UserProjectRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.List;
 
@@ -27,6 +30,7 @@ public class CommentService {
     private final CardRepository cardRepository;
     private final UserRepository userRepository;
     private final UserProjectRepository userProjectRepository;
+    private final BoardWebSocketService boardWsService;
 
     public List<CommentResponse> getComments(Long projectId, Long cardId, Long userId) {
         validateProjectMember(projectId, userId);
@@ -49,13 +53,16 @@ public class CommentService {
                 .build();
         commentRepository.save(comment);
 
+        long count = commentRepository.countByCardId(cardId);
+        broadcastAfterCommit(card.getProjectId(), new BoardEventMessage(BoardEventMessage.COMMENT_COUNT_CHANGED, cardId, null, count));
+
         return CommentResponse.from(comment);
     }
 
     @Transactional
     public void deleteComment(Long projectId, Long cardId, Long commentId, Long userId) {
         validateProjectMember(projectId, userId);
-        findCardInProject(projectId, cardId);
+        Card card = findCardInProject(projectId, cardId);
         Comment comment = commentRepository.findById(commentId)
                 .orElseThrow(() -> new CustomException(ErrorCode.COMMENT_NOT_FOUND));
 
@@ -68,6 +75,18 @@ public class CommentService {
         }
 
         comment.delete();
+
+        long count = commentRepository.countByCardId(cardId);
+        broadcastAfterCommit(card.getProjectId(), new BoardEventMessage(BoardEventMessage.COMMENT_COUNT_CHANGED, cardId, null, count));
+    }
+
+    private void broadcastAfterCommit(Long projectId, BoardEventMessage message) {
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                boardWsService.broadcast(projectId, message);
+            }
+        });
     }
 
     private Card findCardInProject(Long projectId, Long cardId) {

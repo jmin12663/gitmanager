@@ -29,6 +29,6 @@ class ProjectGithubServiceParsingTest {
     }
 
     private ProjectGithubService nullService() {
-        return new ProjectGithubService(null, null, null, null, null);
+        return new ProjectGithubService(null, null, null, null, null, null);
     }
 }

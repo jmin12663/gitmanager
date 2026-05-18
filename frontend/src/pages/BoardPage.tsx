@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useParams } from 'react-router-dom'
+import { useBoardSocket, type BoardSocketMessage } from '@/hooks/useBoardSocket'
 import {
   DndContext,
   DragOverlay,
@@ -25,6 +26,8 @@ import {
   removeBranchApi,
 } from '@/api/board'
 import { getProjectMembersApi } from '@/api/project'
+import { getCardPullsApi } from '@/api/pullrequest'
+import type { PullRequest } from '@/types/pullrequest'
 
 const AVATAR_COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#3b82f6']
 const avatarColor = (id: number) => AVATAR_COLORS[id % AVATAR_COLORS.length]
@@ -53,7 +56,7 @@ function statusKey(status: CardStatus): keyof BoardData {
 }
 
 const BranchIcon = () => (
-  <svg viewBox="0 0 16 16" fill="currentColor" style={{ width: 11, height: 11, flexShrink: 0 }}>
+  <svg viewBox="0 0 16 16" fill="currentColor" className="branch-icon-svg">
     <path d="M11.75 2.5a.75.75 0 100 1.5.75.75 0 000-1.5zm-2.25.75a2.25 2.25 0 113 2.122V6A2.5 2.5 0 019 8.5H7a1 1 0 00-1 1v1.128a2.251 2.251 0 11-1.5 0V5.372a2.25 2.25 0 111.5 0v1.836A2.492 2.492 0 017 7h2a1 1 0 001-1v-.628A2.25 2.25 0 019.5 3.25zM4.25 12a.75.75 0 100 1.5.75.75 0 000-1.5z" />
   </svg>
 )
@@ -114,9 +117,9 @@ function DraggableCard({ card, onClick }: DraggableCardProps) {
             </div>
           ))}
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 'auto' }}>
+        <div className="card-footer-meta">
           {card.commentCount > 0 && (
-            <span style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 11, color: 'var(--gm-text3)' }}>
+            <span className="card-comment-count">
               <svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor">
                 <path d="M1 2.75C1 1.784 1.784 1 2.75 1h10.5c.966 0 1.75.784 1.75 1.75v7.5A1.75 1.75 0 0113.25 12H9.06l-2.573 2.573A1.458 1.458 0 014 13.543V12H2.75A1.75 1.75 0 011 10.25v-7.5z" />
               </svg>
@@ -156,9 +159,7 @@ function DroppableColumn({ status, title, badgeClass, cards, onAddCard, onCardCl
             onClick={() => onCardClick(card)}
           />
         ))}
-        {cards.length === 0 && (
-          <div style={{ flex: 1, minHeight: 60 }} />
-        )}
+        {cards.length === 0 && <div className="col-empty-spacer" />}
       </div>
     </div>
   )
@@ -259,28 +260,17 @@ function CreateCardModal({ projectId, onClose, onCreate }: CreateCardModalProps)
           {members.length > 0 && (
             <div className="auth-field">
               <label>담당자</label>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <div className="assignee-chips">
                 {members.map(m => {
                   const selected = selectedAssigneeIds.includes(m.userId)
                   return (
-                    <label
-                      key={m.userId}
-                      style={{
-                        display: 'flex', alignItems: 'center', gap: 6,
-                        cursor: 'pointer', padding: '4px 10px', borderRadius: 20,
-                        border: `1px solid ${selected ? 'var(--gm-accent)' : 'var(--gm-border2)'}`,
-                        background: selected ? 'var(--gm-accent)' : 'transparent',
-                        color: selected ? 'white' : 'var(--gm-text2)',
-                        fontSize: 13, transition: 'all 0.15s',
-                      }}
-                    >
+                    <label key={m.userId} className={`assignee-chip${selected ? ' selected' : ''}`}>
                       <input
                         type="checkbox"
-                        style={{ display: 'none' }}
                         checked={selected}
                         onChange={() => toggleAssignee(m.userId)}
                       />
-                      <div className="mini-avatar" style={{ background: avatarColor(m.userId), width: 18, height: 18, fontSize: 10 }}>
+                      <div className="mini-avatar" style={{ background: avatarColor(m.userId) }}>
                         {m.name[0]}
                       </div>
                       {m.name}
@@ -293,55 +283,42 @@ function CreateCardModal({ projectId, onClose, onCreate }: CreateCardModalProps)
 
           <div className="auth-field">
             <label>레포 / 브랜치 연결</label>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 6 }}>
+            <div className="branch-input-stack">
               <input
                 type="text"
                 placeholder="Repositories (예: gitmanager)"
                 value={repoInput}
                 onChange={e => setRepoInput(e.target.value)}
               />
-              <div style={{ display: 'flex', gap: 6 }}>
+              <div className="branch-input-row">
                 <input
                   type="text"
                   placeholder="Branch (예: feature/login)"
                   value={branchInput}
                   onChange={e => setBranchInput(e.target.value)}
                   onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddBranch() } }}
-                  style={{ flex: 1 }}
+                  className="branch-input-main"
                 />
                 <button
                   type="button"
                   onClick={handleAddBranch}
                   disabled={!branchInput.trim() || !repoInput.trim()}
-                  style={{
-                    padding: '8px 12px', background: 'var(--gm-bg3)',
-                    border: '1px solid var(--gm-border2)', borderRadius: 'var(--gm-radius)',
-                    cursor: 'pointer', fontSize: 13, color: 'var(--gm-text2)', whiteSpace: 'nowrap',
-                    opacity: !branchInput.trim() || !repoInput.trim() ? 0.4 : 1,
-                  }}
+                  className="branch-add-btn"
                 >
                   추가
                 </button>
               </div>
             </div>
             {branches.length > 0 && (
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              <div className="branch-tag-list">
                 {branches.map(b => (
-                  <div
-                    key={b.branchName}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: 4,
-                      padding: '3px 8px', background: 'var(--gm-bg3)',
-                      border: '1px solid var(--gm-border2)', borderRadius: 12,
-                      fontSize: 12, color: 'var(--gm-text2)',
-                    }}
-                  >
+                  <div key={b.branchName} className="branch-tag">
                     <BranchIcon />
                     {b.branchName}
                     <button
                       type="button"
                       onClick={() => setBranches(prev => prev.filter(x => x.branchName !== b.branchName))}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--gm-text3)', padding: 0, marginLeft: 2, lineHeight: 1 }}
+                      className="branch-tag-remove"
                     >
                       ×
                     </button>
@@ -364,12 +341,13 @@ function CreateCardModal({ projectId, onClose, onCreate }: CreateCardModalProps)
 interface CardDetailModalProps {
   card: CardSummary
   projectId: number
+  prRefreshKey: number
   onClose: () => void
   onDeleted: (cardId: number) => void
   onUpdated: (cardId: number, patch: { title?: string; dueDate?: string | null; commentCount?: number; assignees?: Assignee[] }) => void
 }
 
-function CardDetailModal({ card, projectId, onClose, onDeleted, onUpdated }: CardDetailModalProps) {
+function CardDetailModal({ card, projectId, prRefreshKey, onClose, onDeleted, onUpdated }: CardDetailModalProps) {
   const [detail, setDetail] = useState<CardDetail | null>(null)
   const [comments, setComments] = useState<Comment[]>([])
   const [newComment, setNewComment] = useState('')
@@ -383,6 +361,8 @@ function CardDetailModal({ card, projectId, onClose, onDeleted, onUpdated }: Car
   const [members, setMembers] = useState<{ userId: number; name: string }[]>([])
   const [editAssigneeIds, setEditAssigneeIds] = useState<number[]>([])
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [pulls, setPulls] = useState<PullRequest[]>([])
+  const [pullsLoading, setPullsLoading] = useState(false)
 
   useEffect(() => {
     getProjectMembersApi(projectId)
@@ -402,6 +382,15 @@ function CardDetailModal({ card, projectId, onClose, onDeleted, onUpdated }: Car
       .catch(() => {})
       .finally(() => setLoading(false))
   }, [projectId, card.id])
+
+  useEffect(() => {
+    if (!detail || detail.branches.length === 0) return
+    setPullsLoading(true)
+    getCardPullsApi(projectId, card.id)
+      .then(res => setPulls(res.data.data))
+      .catch(() => {})
+      .finally(() => setPullsLoading(false))
+  }, [projectId, card.id, detail?.branches.length, prRefreshKey])  // prRefreshKey: PR_REVIEW_UPDATED 이벤트 수신 시 증가
 
   async function handleAddComment(e: React.SyntheticEvent) {
     e.preventDefault()
@@ -477,12 +466,12 @@ function CardDetailModal({ card, projectId, onClose, onDeleted, onUpdated }: Car
         <button className="gm-modal-close" onClick={onClose}>×</button>
 
         {loading ? (
-          <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--gm-text3)' }}>로딩 중...</div>
+          <div className="card-detail-msg">로딩 중...</div>
         ) : detail ? (
           <>
             {isEditing ? (
               <>
-                <div className="auth-field" style={{ marginBottom: 12 }}>
+                <div className="auth-field card-detail-field-sm">
                   <label>제목</label>
                   <input
                     type="text"
@@ -491,7 +480,7 @@ function CardDetailModal({ card, projectId, onClose, onDeleted, onUpdated }: Car
                     autoFocus
                   />
                 </div>
-                <div className="auth-field" style={{ marginBottom: 12 }}>
+                <div className="auth-field card-detail-field-sm">
                   <label>마감일</label>
                   <input
                     type="date"
@@ -499,7 +488,7 @@ function CardDetailModal({ card, projectId, onClose, onDeleted, onUpdated }: Car
                     onChange={e => setEditDueDate(e.target.value)}
                   />
                 </div>
-                <div className="auth-field" style={{ marginBottom: 16 }}>
+                <div className="auth-field card-detail-field-md">
                   <label>메모</label>
                   <textarea
                     value={editMemo}
@@ -509,32 +498,21 @@ function CardDetailModal({ card, projectId, onClose, onDeleted, onUpdated }: Car
                   />
                 </div>
                 {members.length > 0 && (
-                  <div className="auth-field" style={{ marginBottom: 16 }}>
+                  <div className="auth-field card-detail-field-md">
                     <label>담당자</label>
-                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    <div className="assignee-chips">
                       {members.map(m => {
                         const selected = editAssigneeIds.includes(m.userId)
                         return (
-                          <label
-                            key={m.userId}
-                            style={{
-                              display: 'flex', alignItems: 'center', gap: 6,
-                              cursor: 'pointer', padding: '4px 10px', borderRadius: 20,
-                              border: `1px solid ${selected ? 'var(--gm-accent)' : 'var(--gm-border2)'}`,
-                              background: selected ? 'var(--gm-accent)' : 'transparent',
-                              color: selected ? 'white' : 'var(--gm-text2)',
-                              fontSize: 13, transition: 'all 0.15s',
-                            }}
-                          >
+                          <label key={m.userId} className={`assignee-chip${selected ? ' selected' : ''}`}>
                             <input
                               type="checkbox"
-                              style={{ display: 'none' }}
                               checked={selected}
                               onChange={() => setEditAssigneeIds(prev =>
                                 prev.includes(m.userId) ? prev.filter(id => id !== m.userId) : [...prev, m.userId]
                               )}
                             />
-                            <div className="mini-avatar" style={{ background: avatarColor(m.userId), width: 18, height: 18, fontSize: 10 }}>
+                            <div className="mini-avatar" style={{ background: avatarColor(m.userId) }}>
                               {m.name[0]}
                             </div>
                             {m.name}
@@ -544,17 +522,14 @@ function CardDetailModal({ card, projectId, onClose, onDeleted, onUpdated }: Car
                     </div>
                   </div>
                 )}
-                <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', paddingTop: 14, borderTop: '1px solid var(--gm-border)' }}>
-                  <button
-                    onClick={() => setIsEditing(false)}
-                    style={{ padding: '8px 16px', background: 'var(--gm-bg3)', border: '1px solid var(--gm-border2)', borderRadius: 'var(--gm-radius)', cursor: 'pointer', fontSize: 13, color: 'var(--gm-text2)' }}
-                  >
+                <div className="card-detail-edit-actions">
+                  <button onClick={() => setIsEditing(false)} className="card-detail-btn-cancel">
                     취소
                   </button>
                   <button
                     onClick={handleSave}
                     disabled={saving || !editTitle.trim()}
-                    style={{ padding: '8px 16px', background: 'var(--gm-accent)', color: 'white', border: 'none', borderRadius: 'var(--gm-radius)', cursor: 'pointer', fontSize: 13, opacity: saving || !editTitle.trim() ? 0.5 : 1 }}
+                    className="card-detail-btn-save"
                   >
                     {saving ? '저장 중...' : '저장'}
                   </button>
@@ -562,145 +537,188 @@ function CardDetailModal({ card, projectId, onClose, onDeleted, onUpdated }: Car
               </>
             ) : (
               <>
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 16 }}>
-              <div className="gm-modal-title" style={{ marginBottom: 0, flex: 1 }}>{detail.title}</div>
-              <span className="card-status-badge" data-status={detail.status}>
-                {STATUS_LABELS[detail.status]}
-              </span>
-              <button
-                onClick={startEdit}
-                style={{ padding: '4px 10px', background: 'var(--gm-bg3)', border: '1px solid var(--gm-border2)', borderRadius: 'var(--gm-radius)', cursor: 'pointer', fontSize: 12, color: 'var(--gm-text2)', flexShrink: 0 }}
-              >
-                수정
-              </button>
-            </div>
+                <div className="card-detail-title-row">
+                  <div className="gm-modal-title">{detail.title}</div>
+                  <span className="card-status-badge" data-status={detail.status}>
+                    {STATUS_LABELS[detail.status]}
+                  </span>
+                  <button onClick={startEdit} className="card-detail-edit-btn">
+                    수정
+                  </button>
+                </div>
 
-            {detail.dueDate && (
-              <div style={{ fontSize: 12, color: 'var(--gm-text3)', marginBottom: 12 }}>
-                마감일: {formatDate(detail.dueDate)}
-              </div>
-            )}
-
-            {detail.memo && (
-              <div style={{ fontSize: 13, color: 'var(--gm-text2)', background: 'var(--gm-bg3)', borderRadius: 8, padding: '10px 14px', marginBottom: 16, lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
-                {detail.memo}
-              </div>
-            )}
-
-            {detail.branches.length > 0 && (
-              <div style={{ marginBottom: 16 }}>
-                <div className="detail-section-label">브랜치</div>
-                {detail.branches.map(b => (
-                  <div key={b.branchName} className="card-branch" style={{ marginBottom: 4, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                      <BranchIcon />
-                      {b.branchName}
-                    </div>
-                    <button
-                      onClick={async () => {
-                        try {
-                          await removeBranchApi(projectId, detail.id, b.branchName)
-                          setDetail(prev => prev ? { ...prev, branches: prev.branches.filter(x => x.branchName !== b.branchName) } : null)
-                        } catch {}
-                      }}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--gm-text3)', fontSize: 11, padding: '2px 4px', lineHeight: 1 }}
-                      title="브랜치 연결 해제"
-                    >
-                      ✕
-                    </button>
+                {detail.dueDate && (
+                  <div className="card-detail-due-date">
+                    마감일: {formatDate(detail.dueDate)}
                   </div>
-                ))}
-              </div>
-            )}
+                )}
 
-            {detail.assignees.length > 0 && (
-              <div style={{ marginBottom: 16 }}>
-                <div className="detail-section-label">담당자</div>
-                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                  {detail.assignees.map(a => (
-                    <div key={a.userId} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--gm-text2)' }}>
-                      <div className="mini-avatar" style={{ background: avatarColor(a.userId) }}>{a.name[0]}</div>
-                      {a.name}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+                {detail.memo && (
+                  <div className="card-detail-memo">{detail.memo}</div>
+                )}
 
-            {detail.commitLogs.length > 0 && (
-              <div style={{ marginBottom: 16 }}>
-                <div className="detail-section-label">커밋 ({detail.commitLogs.length})</div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 120, overflowY: 'auto' }}>
-                  {detail.commitLogs.map(c => (
-                    <div key={c.commitSha} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span className="commit-sha">{c.commitSha.slice(0, 7)}</span>
-                      <span style={{ fontSize: 12, color: 'var(--gm-text2)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.message}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <div style={{ marginBottom: 8 }}>
-              <div className="detail-section-label">댓글 {comments.length > 0 ? `(${comments.length})` : ''}</div>
-              {comments.length > 0 && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxHeight: 200, overflowY: 'auto', marginBottom: 12 }}>
-                  {comments.map(c => (
-                    <div key={c.id} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-                      <div className="mini-avatar" style={{ background: avatarColor(c.userId), flexShrink: 0 }}>{c.userName[0]}</div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 12, color: 'var(--gm-text2)', marginBottom: 2 }}>
-                          <span style={{ fontWeight: 500, color: 'var(--gm-text1)' }}>{c.userName}</span>
-                          {' '}
-                          <span style={{ color: 'var(--gm-text3)' }}>{formatDateTime(c.createdAt)}</span>
+                {detail.branches.length > 0 && (
+                  <div className="card-detail-section">
+                    <div className="detail-section-label">브랜치</div>
+                    {detail.branches.map(b => (
+                      <div key={b.branchName} className="card-detail-branch-row">
+                        <div className="card-detail-branch-inner">
+                          <BranchIcon />
+                          {b.branchName}
                         </div>
-                        <div style={{ fontSize: 13, color: 'var(--gm-text1)', lineHeight: 1.5 }}>{c.content}</div>
+                        <button
+                          onClick={async () => {
+                            try {
+                              await removeBranchApi(projectId, detail.id, b.branchName)
+                              setDetail(prev => prev ? { ...prev, branches: prev.branches.filter(x => x.branchName !== b.branchName) } : null)
+                            } catch {}
+                          }}
+                          className="card-detail-branch-remove"
+                          title="브랜치 연결 해제"
+                        >
+                          ✕
+                        </button>
                       </div>
-                      <button
-                        onClick={() => handleDeleteComment(c.id)}
-                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--gm-text3)', fontSize: 12, padding: '2px 4px', borderRadius: 4, flexShrink: 0, lineHeight: 1 }}
-                        title="삭제"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-              <form onSubmit={handleAddComment} style={{ display: 'flex', gap: 8 }}>
-                <input
-                  type="text"
-                  placeholder="댓글 추가..."
-                  value={newComment}
-                  onChange={e => setNewComment(e.target.value)}
-                  style={{ flex: 1, padding: '8px 12px', background: 'var(--gm-bg3)', border: '1px solid var(--gm-border2)', borderRadius: 'var(--gm-radius)', color: 'var(--gm-text1)', fontSize: 13, fontFamily: 'Geist Variable, sans-serif', outline: 'none' }}
-                />
-                <button
-                  type="submit"
-                  disabled={submitting || !newComment.trim()}
-                  style={{ padding: '8px 14px', background: 'var(--gm-accent)', color: 'white', border: 'none', borderRadius: 'var(--gm-radius)', cursor: 'pointer', fontSize: 12, fontFamily: 'Geist Variable, sans-serif', opacity: submitting || !newComment.trim() ? 0.5 : 1 }}
-                >
-                  전송
-                </button>
-              </form>
-            </div>
+                    ))}
+                  </div>
+                )}
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: 14, borderTop: '1px solid var(--gm-border)', marginTop: 8 }}>
-              {confirmDelete ? (
-                <div className="delete-confirm-row">
-                  <span>정말 삭제하시겠습니까?</span>
-                  <button onClick={handleDeleteCard} className="danger-inline-btn">삭제</button>
-                  <button onClick={() => setConfirmDelete(false)} className="cancel-inline-btn">취소</button>
+                {detail.assignees.length > 0 && (
+                  <div className="card-detail-section">
+                    <div className="detail-section-label">담당자</div>
+                    <div className="card-detail-assignees">
+                      {detail.assignees.map(a => (
+                        <div key={a.userId} className="card-detail-assignee">
+                          <div className="mini-avatar" style={{ background: avatarColor(a.userId) }}>{a.name[0]}</div>
+                          {a.name}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {detail.commitLogs.length > 0 && (
+                  <div className="card-detail-section">
+                    <div className="detail-section-label">커밋 ({detail.commitLogs.length})</div>
+                    <div className="card-detail-commit-list">
+                      {detail.commitLogs.map(c => (
+                        <div key={c.commitSha} className="card-detail-commit-row">
+                          <span className="commit-sha">{c.commitSha.slice(0, 7)}</span>
+                          <span className="card-detail-commit-msg">{c.message}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {detail.branches.length > 0 && (
+                  <div className="card-detail-section">
+                    <div className="detail-section-label">Pull Requests</div>
+                    {pullsLoading ? (
+                      <div className="card-pr-empty">조회 중...</div>
+                    ) : pulls.length === 0 ? (
+                      <div className="card-pr-empty">연결된 PR이 없습니다.</div>
+                    ) : (
+                      <div className="card-pr-list">
+                        {pulls.map(pr => (
+                          <div key={pr.number} className="card-pr-item">
+                            <div className="card-pr-header">
+                              <span className={`card-pr-badge card-pr-badge--${pr.state.toLowerCase()}`}>
+                                {pr.state}
+                              </span>
+                              <a
+                                href={pr.htmlUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="card-pr-title"
+                              >
+                                #{pr.number} {pr.title}
+                              </a>
+                            </div>
+                            <div className="card-pr-meta">
+                              <span className="card-pr-branch">{pr.branchName}</span>
+                              <span className="card-pr-author">by {pr.author}</span>
+                            </div>
+                            {pr.reviewers.length > 0 && (
+                              <div className="card-pr-reviewers">
+                                {pr.reviewers.map(r => (
+                                  <span
+                                    key={r.login}
+                                    className={`card-pr-reviewer card-pr-reviewer--${r.state.toLowerCase()}`}
+                                    title={r.state}
+                                  >
+                                    {r.login}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div className="card-detail-section-sm">
+                  <div className="detail-section-label">댓글 {comments.length > 0 ? `(${comments.length})` : ''}</div>
+                  {comments.length > 0 && (
+                    <div className="card-detail-comment-list">
+                      {comments.map(c => (
+                        <div key={c.id} className="card-detail-comment-row">
+                          <div className="mini-avatar" style={{ background: avatarColor(c.userId) }}>{c.userName[0]}</div>
+                          <div className="card-detail-comment-body">
+                            <div className="card-detail-comment-meta">
+                              <span className="card-detail-comment-author">{c.userName}</span>
+                              {' '}
+                              <span className="card-detail-comment-time">{formatDateTime(c.createdAt)}</span>
+                            </div>
+                            <div className="card-detail-comment-content">{c.content}</div>
+                          </div>
+                          <button
+                            onClick={() => handleDeleteComment(c.id)}
+                            className="card-detail-comment-delete"
+                            title="삭제"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <form onSubmit={handleAddComment} className="card-detail-comment-form">
+                    <input
+                      type="text"
+                      placeholder="댓글 추가..."
+                      value={newComment}
+                      onChange={e => setNewComment(e.target.value)}
+                      className="card-detail-comment-input"
+                    />
+                    <button
+                      type="submit"
+                      disabled={submitting || !newComment.trim()}
+                      className="card-detail-comment-submit"
+                    >
+                      전송
+                    </button>
+                  </form>
                 </div>
-              ) : (
-                <button onClick={() => setConfirmDelete(true)} className="danger-inline-btn">카드 삭제</button>
-              )}
-            </div>
+
+                <div className="card-detail-delete-row">
+                  {confirmDelete ? (
+                    <div className="delete-confirm-row">
+                      <span>정말 삭제하시겠습니까?</span>
+                      <button onClick={handleDeleteCard} className="danger-inline-btn">삭제</button>
+                      <button onClick={() => setConfirmDelete(false)} className="cancel-inline-btn">취소</button>
+                    </div>
+                  ) : (
+                    <button onClick={() => setConfirmDelete(true)} className="danger-inline-btn">카드 삭제</button>
+                  )}
+                </div>
               </>
             )}
           </>
         ) : (
-          <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--gm-text3)' }}>카드를 불러올 수 없습니다.</div>
+          <div className="card-detail-msg">카드를 불러올 수 없습니다.</div>
         )}
       </div>
     </div>
@@ -716,6 +734,7 @@ export default function BoardPage() {
   const [showCreate, setShowCreate] = useState(false)
   const [selectedCard, setSelectedCard] = useState<CardSummary | null>(null)
   const [activeCard, setActiveCard] = useState<CardSummary | null>(null)
+  const [prRefreshKey, setPrRefreshKey] = useState(0)
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
@@ -724,6 +743,57 @@ export default function BoardPage() {
   useEffect(() => {
     loadBoard()
   }, [pid])
+
+  const handleWsMessage = useCallback((msg: BoardSocketMessage) => {
+    if (msg.type === 'PR_REVIEW_UPDATED') {
+      setSelectedCard(prev => {
+        if (prev && prev.id === msg.cardId) setPrRefreshKey(k => k + 1)
+        return prev
+      })
+      return
+    }
+
+    if (msg.type === 'CARD_DELETED') {
+      setBoardData(prev => ({
+        backlog: prev.backlog.filter(c => c.id !== msg.cardId),
+        inProgress: prev.inProgress.filter(c => c.id !== msg.cardId),
+        done: prev.done.filter(c => c.id !== msg.cardId),
+      }))
+      return
+    }
+
+    if (msg.type === 'COMMENT_COUNT_CHANGED' && msg.commentCount !== undefined) {
+      setBoardData(prev => {
+        const apply = (cards: CardSummary[]) =>
+          cards.map(c => c.id === msg.cardId ? { ...c, commentCount: msg.commentCount! } : c)
+        return { backlog: apply(prev.backlog), inProgress: apply(prev.inProgress), done: apply(prev.done) }
+      })
+      return
+    }
+
+    if (!msg.card) return
+
+    const incoming = msg.card as CardSummary
+    const col = statusKey(incoming.status as CardStatus)
+
+    setBoardData(prev => {
+      const existingInCol = prev[col].find(c => c.id === incoming.id)
+      if (existingInCol) {
+        return {
+          ...prev,
+          [col]: prev[col].map(c => c.id === incoming.id ? incoming : c),
+        }
+      }
+      const filtered = {
+        backlog: prev.backlog.filter(c => c.id !== incoming.id),
+        inProgress: prev.inProgress.filter(c => c.id !== incoming.id),
+        done: prev.done.filter(c => c.id !== incoming.id),
+      }
+      return { ...filtered, [col]: [...filtered[col], incoming] }
+    })
+  }, [])
+
+  useBoardSocket(pid, handleWsMessage)
 
   function loadBoard() {
     setLoading(true)
@@ -809,8 +879,8 @@ export default function BoardPage() {
 
   if (loading) {
     return (
-      <div className="board-page-wrap" style={{ alignItems: 'center', justifyContent: 'center' }}>
-        <span style={{ color: 'var(--gm-text3)', fontSize: 14 }}>로딩 중...</span>
+      <div className="board-page-wrap board-loading-wrap">
+        <span className="board-loading-msg">로딩 중...</span>
       </div>
     )
   }
@@ -854,7 +924,7 @@ export default function BoardPage() {
           </div>
           <DragOverlay>
             {activeCard && (
-              <div className={`kanban-card${activeCard.status === 'DONE' ? ' done-card' : ''}`} style={{ boxShadow: '0 8px 24px rgba(0,0,0,0.35)', opacity: 0.95 }}>
+              <div className={`kanban-card${activeCard.status === 'DONE' ? ' done-card' : ''} dragging-overlay`}>
                 <div className="card-header">
                   <div className="card-title-text">{activeCard.title}</div>
                 </div>
@@ -869,9 +939,9 @@ export default function BoardPage() {
                       </div>
                     ))}
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 'auto' }}>
+                  <div className="card-footer-meta">
                     {activeCard.commentCount > 0 && (
-                      <span style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 11, color: 'var(--gm-text3)' }}>
+                      <span className="card-comment-count">
                         <svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor">
                           <path d="M1 2.75C1 1.784 1.784 1 2.75 1h10.5c.966 0 1.75.784 1.75 1.75v7.5A1.75 1.75 0 0113.25 12H9.06l-2.573 2.573A1.458 1.458 0 014 13.543V12H2.75A1.75 1.75 0 011 10.25v-7.5z" />
                         </svg>
@@ -898,6 +968,7 @@ export default function BoardPage() {
         <CardDetailModal
           card={selectedCard}
           projectId={pid}
+          prRefreshKey={prRefreshKey}
           onClose={() => setSelectedCard(null)}
           onDeleted={handleCardDeleted}
           onUpdated={handleCardUpdated}
