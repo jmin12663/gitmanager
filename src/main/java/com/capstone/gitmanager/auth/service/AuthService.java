@@ -1,145 +1,133 @@
 package com.capstone.gitmanager.auth.service;
 
-import com.capstone.gitmanager.auth.dto.ChangePasswordRequest;
-import com.capstone.gitmanager.auth.dto.EmailVerifyRequest;
-import com.capstone.gitmanager.auth.dto.LoginRequest;
-import com.capstone.gitmanager.auth.dto.LoginResponse;
-import com.capstone.gitmanager.auth.dto.RegisterRequest;
-import com.capstone.gitmanager.auth.dto.SendEmailCodeRequest;
 import com.capstone.gitmanager.auth.dto.TokenRefreshResponse;
-import com.capstone.gitmanager.auth.dto.UpdateLoginIdRequest;
 import com.capstone.gitmanager.auth.dto.UpdateProfileRequest;
 import com.capstone.gitmanager.auth.dto.UserResponse;
-import com.capstone.gitmanager.auth.entity.PreEmailVerification;
 import com.capstone.gitmanager.auth.entity.RefreshToken;
 import com.capstone.gitmanager.auth.entity.User;
-import com.capstone.gitmanager.auth.repository.PreEmailVerificationRepository;
 import com.capstone.gitmanager.auth.repository.RefreshTokenRepository;
 import com.capstone.gitmanager.auth.repository.UserRepository;
 import com.capstone.gitmanager.common.config.JwtProperties;
 import com.capstone.gitmanager.common.exception.CustomException;
 import com.capstone.gitmanager.common.exception.ErrorCode;
 import com.capstone.gitmanager.common.util.JwtUtil;
+import com.capstone.gitmanager.github.config.GithubProperties;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.jasypt.encryption.StringEncryptor;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
+import org.springframework.web.client.RestClient;
 import org.springframework.web.util.WebUtils;
 
+import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.Base64;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class AuthService {
 
-    private static final int EMAIL_VERIFICATION_EXPIRE_MINUTES = 5;
-
     @Value("${cookie.secure:false}")
     private boolean cookieSecure;
 
     private final UserRepository userRepository;
-    private final PreEmailVerificationRepository preEmailVerificationRepository;
     private final RefreshTokenRepository refreshTokenRepository;
-    private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
     private final JwtProperties jwtProperties;
-    private final EmailService emailService;
+    private final GithubProperties githubProperties;
+    private final StringEncryptor jasyptStringEncryptor;
 
-    @Transactional
-    public void sendEmailCode(SendEmailCodeRequest request) {
-        if (userRepository.existsByEmail(request.email())) {
-            throw new CustomException(ErrorCode.EMAIL_ALREADY_EXISTS);
-        }
-        preEmailVerificationRepository.deleteByEmail(request.email());
+    private final RestClient restClient = RestClient.create();
+    private final ConcurrentHashMap<String, Long> loginOAuthStates = new ConcurrentHashMap<>();
+    private static final long LOGIN_STATE_TTL_MS = 10 * 60 * 1000L;
 
-        String code = String.format("%06d", new SecureRandom().nextInt(1_000_000));
-        PreEmailVerification pre = PreEmailVerification.builder()
-                .email(request.email())
-                .code(code)
-                .expiresAt(LocalDateTime.now().plusMinutes(EMAIL_VERIFICATION_EXPIRE_MINUTES))
-                .build();
-        preEmailVerificationRepository.save(pre);
-
-        emailService.sendVerificationEmail(request.email(), code);
+    public String generateGithubLoginUrl() {
+        cleanupExpiredLoginStates();
+        String state = UUID.randomUUID().toString();
+        loginOAuthStates.put(state, System.currentTimeMillis() + LOGIN_STATE_TTL_MS);
+        return "https://github.com/login/oauth/authorize" +
+               "?client_id=" + githubProperties.getClientId() +
+               "&redirect_uri=" + URLEncoder.encode(githubProperties.getLoginRedirectUri(), StandardCharsets.UTF_8) +
+               "&scope=read:user,user:email,repo" +
+               "&state=" + state;
     }
 
     @Transactional
-    public void verifyEmailCode(EmailVerifyRequest request) {
-        PreEmailVerification pre = preEmailVerificationRepository.findByEmail(request.email())
-                .orElseThrow(() -> new CustomException(ErrorCode.INVALID_EMAIL_TOKEN));
-
-        if (pre.isExpired()) {
-            throw new CustomException(ErrorCode.EMAIL_TOKEN_EXPIRED);
-        }
-        if (!pre.getCode().equals(request.code())) {
-            throw new CustomException(ErrorCode.INVALID_EMAIL_TOKEN);
+    public String handleGithubCallback(String code, String state, HttpServletResponse response) {
+        if (!consumeLoginState(state)) {
+            log.warn("[GitHub Login] 유효하지 않은 state: {}", state);
+            return githubProperties.getFrontendUrl() + "/login?error=state";
         }
 
-        pre.markVerified();
-    }
-
-    @Transactional
-    public void register(RegisterRequest request) {
-        if (userRepository.existsByLoginId(request.loginId())) {
-            throw new CustomException(ErrorCode.LOGIN_ID_ALREADY_EXISTS);
+        String githubToken;
+        Map<String, Object> githubUser;
+        try {
+            githubToken = exchangeCodeForToken(code);
+            githubUser = fetchGithubUser(githubToken);
+        } catch (Exception e) {
+            log.error("[GitHub Login] GitHub API 호출 실패: {}", e.getMessage());
+            return githubProperties.getFrontendUrl() + "/login?error=github";
         }
 
-        PreEmailVerification pre = preEmailVerificationRepository.findByEmail(request.email())
-                .orElseThrow(() -> new CustomException(ErrorCode.EMAIL_NOT_PRE_VERIFIED));
+        Long githubId = ((Number) githubUser.get("id")).longValue();
+        String githubLogin = (String) githubUser.get("login");
+        String name = githubUser.get("name") != null ? (String) githubUser.get("name") : githubLogin;
+        String email = (String) githubUser.get("email");
+        String avatarUrl = (String) githubUser.get("avatar_url");
 
-        if (!pre.isVerified()) {
-            throw new CustomException(ErrorCode.EMAIL_NOT_PRE_VERIFIED);
+        if (email == null || email.isBlank()) {
+            email = githubLogin + "@github.com";
         }
 
-        User user = User.builder()
-                .loginId(request.loginId())
-                .email(request.email())
-                .password(passwordEncoder.encode(request.password()))
-                .name(request.name())
-                .build();
-        user.verifyEmail();
-        userRepository.save(user);
+        String encryptedToken = jasyptStringEncryptor.encrypt(githubToken);
 
-        preEmailVerificationRepository.deleteByEmail(request.email());
-    }
-
-    @Transactional
-    public LoginResponse login(LoginRequest request, HttpServletResponse response) {
-        User user = resolveUser(request.identifier());
-
-        if (!user.isEmailVerified()) {
-            throw new CustomException(ErrorCode.EMAIL_NOT_VERIFIED);
+        User user = userRepository.findByGithubId(githubId).orElse(null);
+        if (user == null) {
+            user = User.builder()
+                    .githubId(githubId)
+                    .githubLogin(githubLogin)
+                    .githubTokenEncrypted(encryptedToken)
+                    .email(email)
+                    .name(name)
+                    .avatarUrl(avatarUrl)
+                    .build();
+            userRepository.save(user);
+            log.info("[GitHub Login] 신규 유저 생성: githubId={}, login={}", githubId, githubLogin);
+        } else {
+            user.updateGithubToken(encryptedToken);
+            user.updateGithubLogin(githubLogin);
+            user.updateAvatarUrl(avatarUrl);
+            log.info("[GitHub Login] 기존 유저 로그인: githubId={}, login={}", githubId, githubLogin);
         }
 
-        if (!passwordEncoder.matches(request.password(), user.getPassword())) {
-            throw new CustomException(ErrorCode.INVALID_PASSWORD);
-        }
-
-        String accessToken = jwtUtil.generateAccessToken(user.getId());
-        String refreshToken = jwtUtil.generateRefreshToken(user.getId());
-
+        String appRefreshToken = jwtUtil.generateRefreshToken(user.getId());
         refreshTokenRepository.deleteByUser(user);
-
-        RefreshToken refreshTokenEntity = RefreshToken.builder()
+        refreshTokenRepository.save(RefreshToken.builder()
                 .user(user)
-                .tokenHash(hash(refreshToken))
+                .tokenHash(hash(appRefreshToken))
                 .expiresAt(LocalDateTime.now().plusSeconds(jwtProperties.refreshExpiration() / 1000))
-                .build();
-        refreshTokenRepository.save(refreshTokenEntity);
+                .build());
 
-        setRefreshTokenCookie(response, refreshToken);
+        setRefreshTokenCookie(response, appRefreshToken);
 
-        return new LoginResponse(user.getId(), user.getName(), user.getEmail(), accessToken);
+        return githubProperties.getFrontendUrl() + "/todo";
     }
 
     @Transactional
@@ -172,6 +160,7 @@ public class AuthService {
         }
         clearRefreshTokenCookie(response);
     }
+
     public UserResponse getMe(Long userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
@@ -186,45 +175,50 @@ public class AuthService {
         return UserResponse.from(user);
     }
 
-    public void checkLoginId(String loginId) {
-        if (userRepository.existsByLoginId(loginId)) {
-            throw new CustomException(ErrorCode.LOGIN_ID_ALREADY_EXISTS);
+    private String exchangeCodeForToken(String code) {
+        MultiValueMap<String, String> body = new LinkedMultiValueMap<>();
+        body.add("client_id", githubProperties.getClientId());
+        body.add("client_secret", githubProperties.getClientSecret());
+        body.add("code", code);
+        body.add("redirect_uri", githubProperties.getLoginRedirectUri());
+
+        Map<String, String> response = restClient.post()
+                .uri("https://github.com/login/oauth/access_token")
+                .header("Accept", "application/json")
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .body(body)
+                .retrieve()
+                .body(new ParameterizedTypeReference<>() {});
+
+        if (response == null || response.get("access_token") == null) {
+            throw new CustomException(ErrorCode.GITHUB_OAUTH_FAILED);
         }
+        return response.get("access_token");
     }
 
-    @Transactional
-    public UserResponse updateLoginId(Long userId, UpdateLoginIdRequest request) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
-        if (userRepository.existsByLoginId(request.loginId())) {
-            throw new CustomException(ErrorCode.LOGIN_ID_ALREADY_EXISTS);
+    private Map<String, Object> fetchGithubUser(String token) {
+        Map<String, Object> user = restClient.get()
+                .uri("https://api.github.com/user")
+                .header("Authorization", "Bearer " + token)
+                .header("Accept", "application/vnd.github+json")
+                .retrieve()
+                .body(new ParameterizedTypeReference<>() {});
+
+        if (user == null || user.get("id") == null) {
+            throw new CustomException(ErrorCode.GITHUB_OAUTH_FAILED);
         }
-        user.updateLoginId(request.loginId());
-        return UserResponse.from(user);
+        return user;
     }
 
-    @Transactional
-    public void changePassword(Long userId, ChangePasswordRequest request) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
-        if (!passwordEncoder.matches(request.currentPassword(), user.getPassword())) {
-            throw new CustomException(ErrorCode.WRONG_PASSWORD);
-        }
-        user.changePassword(passwordEncoder.encode(request.newPassword()));
+    private boolean consumeLoginState(String state) {
+        if (state == null) return false;
+        Long expiry = loginOAuthStates.remove(state);
+        return expiry != null && expiry > System.currentTimeMillis();
     }
 
-    //로그인 시 이메일 혹은 아이디로
-    public String findEmailByIdentifier(String identifier) {
-        return resolveUser(identifier).getEmail();
-    }
-
-    private User resolveUser(String identifier) {
-        if (identifier.contains("@")) {
-            return userRepository.findByEmail(identifier)
-                    .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
-        }
-        return userRepository.findByLoginId(identifier)
-                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+    private void cleanupExpiredLoginStates() {
+        long now = System.currentTimeMillis();
+        loginOAuthStates.entrySet().removeIf(e -> e.getValue() <= now);
     }
 
     private void setRefreshTokenCookie(HttpServletResponse response, String token) {

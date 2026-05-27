@@ -7,7 +7,7 @@ import java.time.LocalDateTime;
 
 public record ProjectMemberResponse(
         Long userId,
-        String loginId,
+        String githubLogin,
         String name,
         ProjectRole role,
         LocalDateTime joinedAt
@@ -15,7 +15,7 @@ public record ProjectMemberResponse(
     public static ProjectMemberResponse from(UserProject up) {
         return new ProjectMemberResponse(
                 up.getUser().getId(),
-                up.getUser().getLoginId(),
+                up.getUser().getGithubLogin(),
                 up.getUser().getName(),
                 up.getRole(),
                 up.getJoinedAt()

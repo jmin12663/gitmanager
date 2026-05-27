@@ -5,7 +5,6 @@ import com.capstone.gitmanager.common.util.JwtUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
-import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.MediaType;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -13,10 +12,9 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.context.annotation.Bean;
 
 import java.util.Map;
 
@@ -31,25 +29,19 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
-                // REST API이므로 웹사이트 CSRF 비활성화 (JWT로 인증하기 때문에 불필요)
                 .csrf(AbstractHttpConfigurer::disable)
-                // CorsConfig(WebMvcConfigurer)의 설정을 Spring Security에 위임
                 .cors(Customizer.withDefaults())
-                // 세션 미사용 토큰으로만 인증 — JWT 기반 무상태(Stateless) 인증
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        // 로그인 없이 접근 허용하는 경로
                         .requestMatchers(
-                                "/api/auth/send-email-code",  // 이메일 인증코드 전송
-                                "/api/auth/verify-email-code",// 이메일 인증코드 확인
-                                "/api/auth/register",         // 회원가입
-                                "/api/auth/login",            // 로그인
-                                "/api/auth/logout",           // 로그아웃
-                                "/api/auth/refresh",          // 토큰 재발급
-                                "/api/webhook/**",            // GitHub Webhook
-                                "/api/github/oauth/callback", // GitHub OAuth 콜백 (GitHub이 직접 호출)
-                                "/ws/**"                      // WebSocket 핸드셰이크 (JWT는 STOMP CONNECT에서 검증)
+                                "/api/auth/github/login",     // GitHub 로그인 URL 요청
+                                "/api/auth/github/callback",  // GitHub OAuth 콜백 (GitHub이 직접 호출)
+                                "/api/auth/logout",
+                                "/api/auth/refresh",
+                                "/api/webhook/**",
+                                "/api/github/oauth/callback",
+                                "/ws/**"
                         ).permitAll()
                         .requestMatchers(
                                 "/",
@@ -59,8 +51,7 @@ public class SecurityConfig {
                                 "/icons.svg",
                                 "/{path:^(?!api)[^\\.]*}",
                                 "/{path:^(?!api)[^\\.]*}/**"
-                        ).permitAll() // React SPA 라우팅
-                        // 그 외 모든 요청은 로그인(토큰) 필요
+                        ).permitAll()
                         .anyRequest().authenticated()
                 )
                 .exceptionHandling(ex -> ex
@@ -75,17 +66,9 @@ public class SecurityConfig {
                                                     "message", ErrorCode.UNAUTHORIZED.getMessage())));
                         })
                 )
-                // JwtAuthenticationFilter를 Spring Security 필터 체인에 등록
-                // UsernamePasswordAuthenticationFilter 이전에 실행되도록 설정
                 .addFilterBefore(new JwtAuthenticationFilter(jwtUtil, objectMapper),
                         UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
-    }
-
-    // 비밀번호 암호화 등록
-    @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
     }
 }

@@ -2,9 +2,10 @@ import { createContext, useContext } from 'react'
 
 export interface AuthUser {
   userId: number
-  loginId: string
+  githubLogin: string
   name: string
   email: string
+  avatarUrl: string | null
 }
 
 export interface AuthContextType {

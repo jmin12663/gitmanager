@@ -19,7 +19,7 @@ const avatarColor = (id: number) => AVATAR_COLORS[id % AVATAR_COLORS.length]
 
 interface Member {
   userId: number
-  loginId: string
+  githubLogin: string
   name: string
   role: 'OWNER' | 'MEMBER'
   joinedAt: string

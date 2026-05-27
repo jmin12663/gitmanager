@@ -13,6 +13,7 @@ public class GithubProperties {
     private String clientId;
     private String clientSecret;
     private String redirectUri;
+    private String loginRedirectUri;
     private String webhookBaseUrl;
     private String frontendUrl;
 }

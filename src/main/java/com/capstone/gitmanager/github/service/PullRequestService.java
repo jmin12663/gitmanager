@@ -1,5 +1,7 @@
 package com.capstone.gitmanager.github.service;
 
+import com.capstone.gitmanager.auth.entity.User;
+import com.capstone.gitmanager.auth.repository.UserRepository;
 import com.capstone.gitmanager.board.entity.Card;
 import com.capstone.gitmanager.board.repository.CardRepository;
 import com.capstone.gitmanager.common.exception.CustomException;
@@ -34,6 +36,7 @@ public class PullRequestService {
     private final ProjectGithubRepository projectGithubRepository;
     private final CardRepository cardRepository;
     private final UserProjectRepository userProjectRepository;
+    private final UserRepository userRepository;
     private final StringEncryptor jasyptStringEncryptor;
 
     private final RestClient restClient = RestClient.create();
@@ -99,7 +102,10 @@ public class PullRequestService {
         ProjectGithub github = projectGithubRepository.findById(projectId)
                 .orElseThrow(() -> new CustomException(ErrorCode.GITHUB_NOT_CONFIGURED));
 
-        String accessToken = jasyptStringEncryptor.decrypt(github.getOauthTokenEncrypted());
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+
+        String accessToken = jasyptStringEncryptor.decrypt(user.getGithubTokenEncrypted());
         String owner = parseRepoOwner(github.getRepoUrl());
         String repoName = github.getRepoName();
 
@@ -150,7 +156,10 @@ public class PullRequestService {
         ProjectGithub github = projectGithubRepository.findById(projectId)
                 .orElseThrow(() -> new CustomException(ErrorCode.GITHUB_NOT_CONFIGURED));
 
-        String accessToken = jasyptStringEncryptor.decrypt(github.getOauthTokenEncrypted());
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+
+        String accessToken = jasyptStringEncryptor.decrypt(user.getGithubTokenEncrypted());
         String owner = parseRepoOwner(github.getRepoUrl());
         String repoName = github.getRepoName();
 
