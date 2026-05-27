@@ -54,6 +54,4 @@ jobs:
             mv /home/ec2-user/gitmanager-0.0.1-SNAPSHOT.jar /home/ec2-user/app.jar
             pkill -f app.jar || true
             sleep 2
-            source /home/ec2-user/.bashrc
-            nohup java -Dspring.profiles.active=prod -jar /home/ec2-user/app.jar > /home/ec2-user/app.log 2>&1 &
-            disown
+            bash -lc 'nohup java -Dspring.profiles.active=prod -jar /home/ec2-user/app.jar > /home/ec2-user/app.log 2>&1 & disown'
