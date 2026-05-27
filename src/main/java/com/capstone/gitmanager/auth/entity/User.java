@@ -36,6 +36,9 @@ public class User extends BaseEntity {
     @Column
     private String avatarUrl;
 
+    @Column(nullable = false, columnDefinition = "boolean default true")
+    private boolean emailVerified;
+
     @Builder
     private User(Long githubId, String githubLogin, String githubTokenEncrypted,
                  String email, String name, String avatarUrl) {
@@ -45,6 +48,7 @@ public class User extends BaseEntity {
         this.email = email;
         this.name = name;
         this.avatarUrl = avatarUrl;
+        this.emailVerified = true;
     }
 
     public void updateName(String name) {
