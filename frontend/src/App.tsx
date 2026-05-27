@@ -2,6 +2,8 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from '@/store/AuthProvider'
 import AppLayout from '@/components/AppLayout'
 import LoginPage from '@/pages/LoginPage'
+import RegisterPage from '@/pages/RegisterPage'
+import VerifyPage from '@/pages/VerifyPage'
 import BoardPage from '@/pages/BoardPage'
 import CalendarPage from '@/pages/CalendarPage'
 import DashboardPage from '@/pages/DashboardPage'
@@ -15,8 +17,12 @@ export default function App() {
     <AuthProvider>
       <BrowserRouter>
         <Routes>
+          {/* Auth pages (no layout) */}
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
+          <Route path="/verify" element={<VerifyPage />} />
 
+          {/* App pages (with sidebar layout) */}
           <Route element={<AppLayout />}>
             <Route path="/todo" element={<TodoPage />} />
             <Route path="/profile" element={<ProfilePage />} />

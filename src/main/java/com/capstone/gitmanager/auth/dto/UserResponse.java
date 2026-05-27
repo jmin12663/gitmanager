@@ -4,18 +4,11 @@ import com.capstone.gitmanager.auth.entity.User;
 
 public record UserResponse(
         Long userId,
-        String githubLogin,
+        String loginId,
         String name,
-        String email,
-        String avatarUrl
+        String email
 ) {
     public static UserResponse from(User user) {
-        return new UserResponse(
-                user.getId(),
-                user.getGithubLogin(),
-                user.getName(),
-                user.getEmail(),
-                user.getAvatarUrl()
-        );
+        return new UserResponse(user.getId(), user.getLoginId(), user.getName(), user.getEmail());
     }
 }

@@ -19,35 +19,29 @@ public class User extends BaseEntity {
     private Long id;
 
     @Column(nullable = false, unique = true)
-    private Long githubId;
-
-    @Column(nullable = false, unique = true)
-    private String githubLogin;
-
-    @Column(nullable = false)
-    private String githubTokenEncrypted;
+    private String loginId;
 
     @Column(nullable = false, unique = true)
     private String email;
 
     @Column(nullable = false)
+    private String password;
+
+    @Column(nullable = false)
     private String name;
 
-    @Column
-    private String avatarUrl;
-
-    @Column(nullable = false, columnDefinition = "boolean default true")
-    private boolean emailVerified;
+    @Column(nullable = false)
+    private boolean emailVerified = false;
 
     @Builder
-    private User(Long githubId, String githubLogin, String githubTokenEncrypted,
-                 String email, String name, String avatarUrl) {
-        this.githubId = githubId;
-        this.githubLogin = githubLogin;
-        this.githubTokenEncrypted = githubTokenEncrypted;
+    private User(String loginId, String email, String password, String name) {
+        this.loginId = loginId;
         this.email = email;
+        this.password = password;
         this.name = name;
-        this.avatarUrl = avatarUrl;
+    }
+
+    public void verifyEmail() {
         this.emailVerified = true;
     }
 
@@ -55,15 +49,11 @@ public class User extends BaseEntity {
         this.name = name;
     }
 
-    public void updateGithubToken(String encryptedToken) {
-        this.githubTokenEncrypted = encryptedToken;
+    public void updateLoginId(String loginId) {
+        this.loginId = loginId;
     }
 
-    public void updateGithubLogin(String githubLogin) {
-        this.githubLogin = githubLogin;
-    }
-
-    public void updateAvatarUrl(String avatarUrl) {
-        this.avatarUrl = avatarUrl;
+    public void changePassword(String encodedPassword) {
+        this.password = encodedPassword;
     }
 }
