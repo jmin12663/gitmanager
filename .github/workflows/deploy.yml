@@ -51,8 +51,10 @@ jobs:
           username: ${{ secrets.EC2_USERNAME }}
           key: ${{ secrets.EC2_KEY }}
           script: |
+            bash -lc '
             [ -f /home/ec2-user/app.pid ] && kill $(cat /home/ec2-user/app.pid) 2>/dev/null || true
             sleep 2
             mv /home/ec2-user/gitmanager-0.0.1-SNAPSHOT.jar /home/ec2-user/app.jar
             nohup java -Dspring.profiles.active=prod -jar /home/ec2-user/app.jar > /home/ec2-user/app.log 2>&1 </dev/null &
             echo $! > /home/ec2-user/app.pid
+            '
