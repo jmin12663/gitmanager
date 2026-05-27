@@ -2,6 +2,8 @@ package com.capstone.gitmanager.github.controller;
 
 import com.capstone.gitmanager.common.dto.ApiResponse;
 import com.capstone.gitmanager.github.dto.CreatePrCommentRequest;
+import com.capstone.gitmanager.github.dto.CreatePrCommentReplyRequest;
+import com.capstone.gitmanager.github.dto.PrLineCommentResponse;
 import com.capstone.gitmanager.github.dto.PullFileResponse;
 import com.capstone.gitmanager.github.dto.PullRequestResponse;
 import com.capstone.gitmanager.github.service.PullRequestService;
@@ -45,14 +47,33 @@ public class PullRequestController {
         return ApiResponse.ok(pullRequestService.getPullFiles(projectId, prNumber, userId));
     }
 
+    @GetMapping("/api/projects/{projectId}/pulls/{prNumber}/comments")
+    public ApiResponse<List<PrLineCommentResponse>> getPrLineComments(
+            @PathVariable Long projectId,
+            @PathVariable int prNumber,
+            @AuthenticationPrincipal Long userId
+    ) {
+        return ApiResponse.ok(pullRequestService.getPrLineComments(projectId, prNumber, userId));
+    }
+
     @PostMapping("/api/projects/{projectId}/pulls/{prNumber}/comments")
-    public ApiResponse<Void> createPrComment(
+    public ApiResponse<PrLineCommentResponse> createPrComment(
             @PathVariable Long projectId,
             @PathVariable int prNumber,
             @RequestBody @Valid CreatePrCommentRequest request,
             @AuthenticationPrincipal Long userId
     ) {
-        pullRequestService.createPrComment(projectId, prNumber, request, userId);
-        return ApiResponse.ok();
+        return ApiResponse.ok(pullRequestService.createPrComment(projectId, prNumber, request, userId));
+    }
+
+    @PostMapping("/api/projects/{projectId}/pulls/{prNumber}/comments/{commentId}/replies")
+    public ApiResponse<PrLineCommentResponse> createPrCommentReply(
+            @PathVariable Long projectId,
+            @PathVariable int prNumber,
+            @PathVariable long commentId,
+            @RequestBody @Valid CreatePrCommentReplyRequest request,
+            @AuthenticationPrincipal Long userId
+    ) {
+        return ApiResponse.ok(pullRequestService.createPrCommentReply(projectId, prNumber, commentId, request, userId));
     }
 }

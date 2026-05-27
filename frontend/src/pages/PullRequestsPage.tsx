@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useParams } from 'react-router-dom'
-import { getProjectPullsApi, getPullFilesApi, createPrCommentApi } from '@/api/pullrequest'
-import type { PullFile, PullRequest } from '@/types/pullrequest'
+import { getProjectPullsApi, getPullFilesApi, getPrCommentsApi, createPrCommentApi, createPrCommentReplyApi } from '@/api/pullrequest'
+import type { PullFile, PullRequest, PrLineComment } from '@/types/pullrequest'
 
 type TabState = 'open' | 'draft' | 'merged' | 'closed'
 
@@ -71,14 +71,32 @@ interface DiffBlockProps {
   prNumber: number
   headSha: string
   projectId: number
+  onCommentAdded: (comment: PrLineComment) => void
+  fileComments: PrLineComment[]
 }
 
-function DiffBlock({ patch, filename, prNumber, headSha, projectId }: DiffBlockProps) {
+function DiffBlock({ patch, filename, prNumber, headSha, projectId, onCommentAdded, fileComments }: DiffBlockProps) {
   const [activeCommentLine, setActiveCommentLine] = useState<number | null>(null)
   const [commentText, setCommentText] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [successLines, setSuccessLines] = useState<Set<number>>(new Set())
   const [error, setError] = useState('')
+  const [collapsedLines, setCollapsedLines] = useState<Set<number>>(new Set())
+  const [activeReplyId, setActiveReplyId] = useState<number | null>(null)
+  const [replyText, setReplyText] = useState('')
+  const [replySubmitting, setReplySubmitting] = useState(false)
+  const [replyError, setReplyError] = useState('')
+
+  const commentsByLine = useMemo(() => {
+    const map = new Map<number, PrLineComment[]>()
+    for (const c of fileComments) {
+      if (c.line != null) {
+        if (!map.has(c.line)) map.set(c.line, [])
+        map.get(c.line)!.push(c)
+      }
+    }
+    return map
+  }, [fileComments])
 
   if (!patch) {
     return <div className="diff-no-patch">패치 정보가 없습니다. (바이너리 파일이거나 너무 큰 파일입니다)</div>
@@ -92,12 +110,21 @@ function DiffBlock({ patch, filename, prNumber, headSha, projectId }: DiffBlockP
     setError('')
   }
 
+  function toggleCollapsedLine(line: number) {
+    setCollapsedLines(prev => {
+      const next = new Set(prev)
+      if (next.has(line)) next.delete(line)
+      else next.add(line)
+      return next
+    })
+  }
+
   async function submitComment(line: number) {
     if (!commentText.trim() || !headSha) return
     setSubmitting(true)
     setError('')
     try {
-      await createPrCommentApi(projectId, prNumber, {
+      const res = await createPrCommentApi(projectId, prNumber, {
         body: commentText.trim(),
         commitId: headSha,
         path: filename,
@@ -107,6 +134,8 @@ function DiffBlock({ patch, filename, prNumber, headSha, projectId }: DiffBlockP
       setSuccessLines(prev => new Set([...prev, line]))
       setActiveCommentLine(null)
       setCommentText('')
+      onCommentAdded(res.data.data)
+      setCollapsedLines(prev => { const next = new Set(prev); next.delete(line); return next })
     } catch {
       setError('코멘트 등록에 실패했습니다. 이미 병합된 PR이거나 권한이 없을 수 있습니다.')
     } finally {
@@ -114,73 +143,186 @@ function DiffBlock({ patch, filename, prNumber, headSha, projectId }: DiffBlockP
     }
   }
 
+  async function submitReply(commentId: number, line: number) {
+    if (!replyText.trim()) return
+    setReplySubmitting(true)
+    setReplyError('')
+    try {
+      const res = await createPrCommentReplyApi(projectId, prNumber, commentId, replyText.trim())
+      setActiveReplyId(null)
+      setReplyText('')
+      onCommentAdded(res.data.data)
+      setCollapsedLines(prev => { const next = new Set(prev); next.delete(line); return next })
+    } catch {
+      setReplyError('답글 등록에 실패했습니다.')
+    } finally {
+      setReplySubmitting(false)
+    }
+  }
+
   return (
     <div className="diff-block">
-      {lines.map((lineInfo, i) => (
-        <div key={i}>
-          <div className={`diff-line-wrap${lineInfo.type !== 'context' ? ` diff-${lineInfo.type}` : ''}`}>
-            <span className="diff-line-num">{lineInfo.newLine ?? ''}</span>
-            {lineInfo.newLine && lineInfo.type !== 'removed' && (
-              <button
-                className={`diff-comment-btn${successLines.has(lineInfo.newLine) ? ' diff-comment-btn--done' : ''}`}
-                onClick={() => toggleCommentForm(lineInfo.newLine!)}
-                title="이 줄에 코멘트 달기"
-              >
-                {successLines.has(lineInfo.newLine) ? '✓' : '+'}
-              </button>
-            )}
-            {(!lineInfo.newLine || lineInfo.type === 'removed') && (
-              <span className="diff-comment-btn-placeholder" />
-            )}
-            <span className="diff-line-content">{lineInfo.text}</span>
-          </div>
-
-          {activeCommentLine === lineInfo.newLine && lineInfo.newLine && (
-            <div className="diff-comment-form">
-              <textarea
-                className="diff-comment-textarea"
-                value={commentText}
-                onChange={e => setCommentText(e.target.value)}
-                placeholder={`${filename} ${lineInfo.newLine}번 줄에 코멘트...`}
-                rows={3}
-                autoFocus
-              />
-              {error && <div className="diff-comment-error">{error}</div>}
-              <div className="diff-comment-actions">
+      {lines.map((lineInfo, i) => {
+        const lineCommentCount = lineInfo.newLine ? (commentsByLine.get(lineInfo.newLine)?.length ?? 0) : 0
+        const isCollapsed = lineInfo.newLine !== null && collapsedLines.has(lineInfo.newLine)
+        return (
+          <div key={i}>
+            <div className={`diff-line-wrap${lineInfo.type !== 'context' ? ` diff-${lineInfo.type}` : ''}`}>
+              <span className="diff-line-num">{lineInfo.newLine ?? ''}</span>
+              {lineInfo.newLine && lineInfo.type !== 'removed' && (
                 <button
-                  className="diff-comment-cancel"
-                  onClick={() => { setActiveCommentLine(null); setCommentText(''); setError('') }}
+                  className={`diff-comment-btn${successLines.has(lineInfo.newLine) ? ' diff-comment-btn--done' : ''}`}
+                  onClick={() => toggleCommentForm(lineInfo.newLine!)}
+                  title="이 줄에 코멘트 달기"
                 >
-                  취소
+                  {successLines.has(lineInfo.newLine) ? '✓' : '+'}
                 </button>
-                <button
-                  className="diff-comment-submit"
-                  onClick={() => submitComment(lineInfo.newLine!)}
-                  disabled={submitting || !commentText.trim()}
-                >
-                  {submitting ? '등록 중...' : '코멘트 등록'}
-                </button>
-              </div>
+              )}
+              {(!lineInfo.newLine || lineInfo.type === 'removed') && (
+                <span className="diff-comment-btn-placeholder" />
+              )}
+              <span className="diff-line-content">{lineInfo.text}</span>
             </div>
-          )}
-        </div>
-      ))}
+
+            {lineCommentCount > 0 && (
+              <div className="diff-thread-block">
+                <button
+                  className="diff-thread-header"
+                  onClick={() => toggleCollapsedLine(lineInfo.newLine!)}
+                >
+                  <span className="diff-thread-chevron">{isCollapsed ? '▶' : '▼'}</span>
+                  <span className="diff-thread-header-label">
+                    Line {lineInfo.newLine} · 코멘트 {lineCommentCount}개
+                  </span>
+                </button>
+                {!isCollapsed && (
+                  <div className="diff-thread-body">
+                    {commentsByLine.get(lineInfo.newLine!)!
+                      .filter(c => !c.inReplyToId)
+                      .map(c => {
+                        const replies = commentsByLine.get(lineInfo.newLine!)!.filter(r => r.inReplyToId === c.id)
+                        return (
+                          <div key={c.id} className="diff-inline-comment">
+                            <div className="diff-inline-comment-meta">
+                              <span className="diff-inline-comment-author">{c.author}</span>
+                              <span className="diff-inline-comment-date">{formatCommentDate(c.createdAt)}</span>
+                            </div>
+                            <div className="diff-inline-comment-body">{c.body}</div>
+                            <button
+                              className="diff-reply-btn"
+                              onClick={() => {
+                                setActiveReplyId(prev => prev === c.id ? null : c.id)
+                                setReplyText('')
+                                setReplyError('')
+                              }}
+                            >
+                              {activeReplyId === c.id ? '취소' : '답글'}
+                            </button>
+
+                            {replies.length > 0 && (
+                              <div className="diff-reply-list">
+                                {replies.map(r => (
+                                  <div key={r.id} className="diff-reply-item">
+                                    <div className="diff-inline-comment-meta">
+                                      <span className="diff-inline-comment-author">{r.author}</span>
+                                      <span className="diff-inline-comment-date">{formatCommentDate(r.createdAt)}</span>
+                                    </div>
+                                    <div className="diff-inline-comment-body">{r.body}</div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+
+                            {activeReplyId === c.id && (
+                              <div className="diff-reply-form">
+                                <textarea
+                                  className="diff-comment-textarea"
+                                  value={replyText}
+                                  onChange={e => setReplyText(e.target.value)}
+                                  placeholder="답글을 입력하세요..."
+                                  rows={3}
+                                  autoFocus
+                                />
+                                {replyError && <div className="diff-comment-error">{replyError}</div>}
+                                <div className="diff-comment-actions">
+                                  <button
+                                    className="diff-comment-submit"
+                                    onClick={() => submitReply(c.id, lineInfo.newLine!)}
+                                    disabled={replySubmitting || !replyText.trim()}
+                                  >
+                                    {replySubmitting ? '등록 중...' : '답글 등록'}
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })
+                    }
+                  </div>
+                )}
+              </div>
+            )}
+
+            {activeCommentLine === lineInfo.newLine && lineInfo.newLine && (
+              <div className="diff-comment-form">
+                <textarea
+                  className="diff-comment-textarea"
+                  value={commentText}
+                  onChange={e => setCommentText(e.target.value)}
+                  placeholder={`${filename} ${lineInfo.newLine}번 줄에 코멘트...`}
+                  rows={3}
+                  autoFocus
+                />
+                {error && <div className="diff-comment-error">{error}</div>}
+                <div className="diff-comment-actions">
+                  <button
+                    className="diff-comment-cancel"
+                    onClick={() => { setActiveCommentLine(null); setCommentText(''); setError('') }}
+                  >
+                    취소
+                  </button>
+                  <button
+                    className="diff-comment-submit"
+                    onClick={() => submitComment(lineInfo.newLine!)}
+                    disabled={submitting || !commentText.trim()}
+                  >
+                    {submitting ? '등록 중...' : '코멘트 등록'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )
+      })}
     </div>
   )
 }
 
+function formatCommentDate(dateStr: string): string {
+  if (!dateStr) return ''
+  const d = new Date(dateStr)
+  return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}
+
 function PrDiffPanel({ projectId, pr }: { projectId: number; pr: PullRequest }) {
   const [files, setFiles] = useState<PullFile[]>([])
+  const [comments, setComments] = useState<PrLineComment[]>([])
   const [loading, setLoading] = useState(true)
   const [expandedFiles, setExpandedFiles] = useState<Set<string>>(new Set())
 
   useEffect(() => {
-    getPullFilesApi(projectId, pr.number)
-      .then(res => {
-        const data = res.data.data
-        setFiles(data)
-        if (data.length <= 5) {
-          setExpandedFiles(new Set(data.map(f => f.filename)))
+    setLoading(true)
+    Promise.all([
+      getPullFilesApi(projectId, pr.number),
+      getPrCommentsApi(projectId, pr.number),
+    ])
+      .then(([filesRes, commentsRes]) => {
+        const fileData = filesRes.data.data
+        setFiles(fileData)
+        setComments(commentsRes.data.data)
+        if (fileData.length <= 5) {
+          setExpandedFiles(new Set(fileData.map(f => f.filename)))
         }
       })
       .catch(() => {})
@@ -196,8 +338,11 @@ function PrDiffPanel({ projectId, pr }: { projectId: number; pr: PullRequest }) 
     })
   }
 
-  if (loading) return <div className="diff-loading">파일 목록 불러오는 중...</div>
-  if (files.length === 0) return <div className="diff-loading">변경된 파일이 없습니다.</div>
+  function handleCommentAdded(comment: PrLineComment) {
+    setComments(prev => [...prev, comment])
+  }
+
+  if (loading) return <div className="diff-loading">불러오는 중...</div>
 
   const totalAdditions = files.reduce((s, f) => s + f.additions, 0)
   const totalDeletions = files.reduce((s, f) => s + f.deletions, 0)
@@ -210,28 +355,40 @@ function PrDiffPanel({ projectId, pr }: { projectId: number; pr: PullRequest }) 
         <span className="diff-deletions">−{totalDeletions}</span>
       </div>
 
-      {files.map(file => (
-        <div key={file.filename} className="diff-file">
-          <button className="diff-file-header" onClick={() => toggleFile(file.filename)}>
-            <FileStatusBadge status={file.status} />
-            <span className="diff-filename">{file.filename}</span>
-            <span className="diff-file-stats">
-              <span className="diff-additions">+{file.additions}</span>
-              <span className="diff-deletions">−{file.deletions}</span>
-            </span>
-            <span className="diff-toggle">{expandedFiles.has(file.filename) ? '▲' : '▼'}</span>
-          </button>
-          {expandedFiles.has(file.filename) && (
-            <DiffBlock
-              patch={file.patch}
-              filename={file.filename}
-              prNumber={pr.number}
-              headSha={pr.headSha}
-              projectId={projectId}
-            />
-          )}
-        </div>
-      ))}
+      {files.length === 0 ? (
+        <div className="diff-loading">변경된 파일이 없습니다.</div>
+      ) : (
+        files.map(file => {
+          const fileComments = comments.filter(c => c.path === file.filename)
+          return (
+            <div key={file.filename} className="diff-file">
+              <button className="diff-file-header" onClick={() => toggleFile(file.filename)}>
+                <FileStatusBadge status={file.status} />
+                <span className="diff-filename">{file.filename}</span>
+                <span className="diff-file-stats">
+                  <span className="diff-additions">+{file.additions}</span>
+                  <span className="diff-deletions">−{file.deletions}</span>
+                </span>
+                {fileComments.length > 0 && (
+                  <span className="diff-file-comment-count">💬 {fileComments.length}</span>
+                )}
+                <span className="diff-toggle">{expandedFiles.has(file.filename) ? '▲' : '▼'}</span>
+              </button>
+              {expandedFiles.has(file.filename) && (
+                <DiffBlock
+                  patch={file.patch}
+                  filename={file.filename}
+                  prNumber={pr.number}
+                  headSha={pr.headSha}
+                  projectId={projectId}
+                  onCommentAdded={handleCommentAdded}
+                  fileComments={fileComments}
+                />
+              )}
+            </div>
+          )
+        })
+      )}
     </div>
   )
 }
@@ -245,37 +402,30 @@ function PrItem({ pr, projectId }: { pr: PullRequest; projectId: number }) {
         <div className="pr-item-left">
           <span className={`pr-badge pr-badge--${pr.state.toLowerCase()}`}>{pr.state}</span>
           <div className="pr-item-body">
-            <a href={pr.htmlUrl} target="_blank" rel="noreferrer" className="pr-item-title">
-              #{pr.number} {pr.title}
-            </a>
-            <div className="pr-item-meta">
-              <span className="pr-item-branch">{pr.branchName}</span>
-              <span className="pr-item-dot">·</span>
-              <span>{pr.author}</span>
-              <span className="pr-item-dot">·</span>
-              <span>{formatDate(pr.createdAt)}</span>
-            </div>
-            {pr.reviewers.length > 0 && (
-              <div className="pr-item-reviewers">
-                {pr.reviewers.map(r => (
-                  <span key={r.login} className={`pr-reviewer pr-reviewer--${r.state.toLowerCase()}`} title={r.state}>
-                    {r.login}
-                  </span>
-                ))}
+            <div className="pr-item-text">
+              <a href={pr.htmlUrl} target="_blank" rel="noreferrer" className="pr-item-title">
+                #{pr.number} {pr.title}
+              </a>
+              <div className="pr-item-meta">
+                <span className="pr-item-branch">{pr.branchName}</span>
+                <span className="pr-item-dot">·</span>
+                <span>{pr.author}</span>
+                <span className="pr-item-dot">·</span>
+                <span>{formatDate(pr.createdAt)}</span>
               </div>
-            )}
+            </div>
+            <div className="pr-item-actions">
+              <button
+                className={`pr-diff-toggle-btn${showDiff ? ' active' : ''}`}
+                onClick={() => setShowDiff(v => !v)}
+              >
+                {showDiff ? '코드 숨기기' : '코드 보기'}
+              </button>
+              <a href={pr.htmlUrl} target="_blank" rel="noreferrer" className="pr-item-link">
+                GitHub ↗
+              </a>
+            </div>
           </div>
-        </div>
-        <div className="pr-item-actions">
-          <button
-            className={`pr-diff-toggle-btn${showDiff ? ' active' : ''}`}
-            onClick={() => setShowDiff(v => !v)}
-          >
-            {showDiff ? '코드 숨기기' : '코드 보기'}
-          </button>
-          <a href={pr.htmlUrl} target="_blank" rel="noreferrer" className="pr-item-link">
-            GitHub ↗
-          </a>
         </div>
       </div>
 

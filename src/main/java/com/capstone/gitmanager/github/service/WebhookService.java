@@ -153,10 +153,6 @@ public class WebhookService {
     public void handlePullRequest(WebhookPayload payload) {
         if (payload.pullRequest == null || !payload.pullRequest.merged) return;
 
-        // main 브랜치로 merge된 경우만 처리
-        String baseBranch = payload.pullRequest.base.ref;
-        if (!"main".equals(baseBranch) && !"master".equals(baseBranch)) return;
-
         String branchName = payload.pullRequest.head.ref;
         String repoName = payload.repository.name;
 

@@ -5,6 +5,8 @@ import com.capstone.gitmanager.board.repository.CardRepository;
 import com.capstone.gitmanager.common.exception.CustomException;
 import com.capstone.gitmanager.common.exception.ErrorCode;
 import com.capstone.gitmanager.github.dto.CreatePrCommentRequest;
+import com.capstone.gitmanager.github.dto.CreatePrCommentReplyRequest;
+import com.capstone.gitmanager.github.dto.PrLineCommentResponse;
 import com.capstone.gitmanager.github.dto.PullFileResponse;
 import com.capstone.gitmanager.github.dto.PullRequestResponse;
 import com.capstone.gitmanager.github.entity.ProjectGithub;
@@ -91,7 +93,7 @@ public class PullRequestService {
                 .toList();
     }
 
-    public void createPrComment(Long projectId, int prNumber, CreatePrCommentRequest request, Long userId) {
+    public PrLineCommentResponse createPrComment(Long projectId, int prNumber, CreatePrCommentRequest request, Long userId) {
         validateMember(projectId, userId);
 
         ProjectGithub github = projectGithubRepository.findById(projectId)
@@ -110,17 +112,63 @@ public class PullRequestService {
         );
 
         try {
-            restClient.post()
+            Map<String, Object> created = restClient.post()
                     .uri("https://api.github.com/repos/{owner}/{repo}/pulls/{prNumber}/comments",
                             owner, repoName, prNumber)
                     .header("Authorization", "Bearer " + accessToken)
                     .header("Accept", "application/vnd.github+json")
                     .body(body)
                     .retrieve()
-                    .toBodilessEntity();
+                    .body(new ParameterizedTypeReference<>() {});
+            if (created == null) throw new CustomException(ErrorCode.INTERNAL_SERVER_ERROR);
+            return PrLineCommentResponse.from(created);
+        } catch (CustomException e) {
+            throw e;
         } catch (Exception e) {
             log.warn("[PR] 라인 코멘트 등록 실패. prNumber={}, path={}, line={}, error={}",
                     prNumber, request.path(), request.line(), e.getMessage());
+            throw new CustomException(ErrorCode.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    public List<PrLineCommentResponse> getPrLineComments(Long projectId, int prNumber, Long userId) {
+        validateMember(projectId, userId);
+
+        ProjectGithub github = projectGithubRepository.findById(projectId)
+                .orElseThrow(() -> new CustomException(ErrorCode.GITHUB_NOT_CONFIGURED));
+
+        String accessToken = jasyptStringEncryptor.decrypt(github.getOauthTokenEncrypted());
+        String owner = parseRepoOwner(github.getRepoUrl());
+        String repoName = github.getRepoName();
+
+        return fetchPrLineComments(owner, repoName, prNumber, accessToken);
+    }
+
+    public PrLineCommentResponse createPrCommentReply(Long projectId, int prNumber, long commentId, CreatePrCommentReplyRequest request, Long userId) {
+        validateMember(projectId, userId);
+
+        ProjectGithub github = projectGithubRepository.findById(projectId)
+                .orElseThrow(() -> new CustomException(ErrorCode.GITHUB_NOT_CONFIGURED));
+
+        String accessToken = jasyptStringEncryptor.decrypt(github.getOauthTokenEncrypted());
+        String owner = parseRepoOwner(github.getRepoUrl());
+        String repoName = github.getRepoName();
+
+        try {
+            Map<String, Object> created = restClient.post()
+                    .uri("https://api.github.com/repos/{owner}/{repo}/pulls/{prNumber}/comments/{commentId}/replies",
+                            owner, repoName, prNumber, commentId)
+                    .header("Authorization", "Bearer " + accessToken)
+                    .header("Accept", "application/vnd.github+json")
+                    .body(Map.of("body", request.body()))
+                    .retrieve()
+                    .body(new ParameterizedTypeReference<>() {});
+            if (created == null) throw new CustomException(ErrorCode.INTERNAL_SERVER_ERROR);
+            return PrLineCommentResponse.from(created);
+        } catch (CustomException e) {
+            throw e;
+        } catch (Exception e) {
+            log.warn("[PR] 답글 등록 실패. prNumber={}, commentId={}, error={}", prNumber, commentId, e.getMessage());
             throw new CustomException(ErrorCode.INTERNAL_SERVER_ERROR);
         }
     }
@@ -180,6 +228,24 @@ public class PullRequestService {
             return res != null ? res : List.of();
         } catch (Exception e) {
             log.warn("[PR] 프로젝트 PR 목록 조회 실패. error={}", e.getMessage());
+            return List.of();
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<PrLineCommentResponse> fetchPrLineComments(String owner, String repo, int prNumber, String token) {
+        try {
+            List<Map<String, Object>> res = restClient.get()
+                    .uri("https://api.github.com/repos/{owner}/{repo}/pulls/{prNumber}/comments?per_page=100",
+                            owner, repo, prNumber)
+                    .header("Authorization", "Bearer " + token)
+                    .header("Accept", "application/vnd.github+json")
+                    .retrieve()
+                    .body(new ParameterizedTypeReference<>() {});
+            if (res == null) return List.of();
+            return res.stream().map(PrLineCommentResponse::from).toList();
+        } catch (Exception e) {
+            log.warn("[PR] 라인 코멘트 조회 실패. prNumber={}, error={}", prNumber, e.getMessage());
             return List.of();
         }
     }

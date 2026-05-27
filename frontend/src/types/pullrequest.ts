@@ -30,3 +30,14 @@ export interface CreatePrCommentBody {
   line: number
   side: 'RIGHT' | 'LEFT'
 }
+
+export interface PrLineComment {
+  id: number
+  path: string
+  line: number | null
+  side: string
+  body: string
+  author: string
+  createdAt: string
+  inReplyToId?: number | null
+}

@@ -73,11 +73,6 @@ public class GithubSyncService {
             for (Map<String, Object> pr : prs) {
                 if (pr.get("merged_at") == null) continue;
 
-                Map<String, Object> base = (Map<String, Object>) pr.get("base");
-                if (base == null) continue;
-                String baseBranch = (String) base.get("ref");
-                if (!"main".equals(baseBranch) && !"master".equals(baseBranch)) continue;
-
                 Map<String, Object> head = (Map<String, Object>) pr.get("head");
                 if (head == null) continue;
                 String branchName = (String) head.get("ref");

@@ -113,7 +113,7 @@ com.capstone.gitmanager
 **카드 상태 자동 전환**
 - branch 생성 → 미연결 카드 자동 생성 (IN_PROGRESS)
 - commit push → 연결 카드가 BACKLOG이면 IN_PROGRESS
-- main merge → DONE + merge 시간 기록
+- PR merge → DONE + merge 시간 기록 (base 브랜치 무관 — feature→develop, feature→main 등 모든 PR 머지)
 
 **Webhook 처리 (`POST /api/webhook/github`)**
 ```
@@ -121,7 +121,7 @@ X-Hub-Signature-256 검증 (실패 → 403)
 "create"        → card_branch 없으면 미연결 카드 생성 (IN_PROGRESS)
 "delete"        → card_branch 레코드 제거 (카드 유지)
 "push"          → IN_PROGRESS 전환 + commit_logs 저장 (SHA UNIQUE로 중복 방지)
-"pull_request"  → merged=true → DONE + merge 시간 기록
+"pull_request"  → merged=true → DONE + merge 시간 기록 (base 브랜치 무관)
 ```
 
 **수동 GitHub 동기화 (`POST /api/projects/{projectId}/github/sync`)**

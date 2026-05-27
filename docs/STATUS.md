@@ -35,7 +35,7 @@
   - [x] branch 생성 → 카드 자동 생성 (IN_PROGRESS)
   - [x] branch 삭제 → card_branch 연결 제거
   - [x] commit push → 커밋 이력 저장
-  - [x] PR merge (main/master) → 카드 DONE 전환
+  - [x] PR merge → 카드 DONE 전환 (base 브랜치 무관 — feature→develop, feature→main 등 모든 PR 머지 처리)
 - [ ] 기능 1 (2차): RTR 추가 적용
 - [x] 기능 6: 캘린더 (일정 CRUD, 기간 조회)
   - [x] 캘린더 일정 수정/삭제 → 연결된 카드 dueDate 양방향 동기화
