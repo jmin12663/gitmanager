@@ -348,6 +348,7 @@ interface CardDetailModalProps {
 }
 
 function CardDetailModal({ card, projectId, prRefreshKey, onClose, onDeleted, onUpdated }: CardDetailModalProps) {
+  const navigate = useNavigate()
   const [detail, setDetail] = useState<CardDetail | null>(null)
   const [comments, setComments] = useState<Comment[]>([])
   const [newComment, setNewComment] = useState('')
@@ -628,7 +629,7 @@ function CardDetailModal({ card, projectId, prRefreshKey, onClose, onDeleted, on
                               </span>
                               <button
                                 className="card-pr-title"
-                                onClick={() => navigate(`/projects/${pid}/pulls?pr=${pr.number}`)}
+                                onClick={() => navigate(`/projects/${projectId}/pulls?pr=${pr.number}`)}
                               >
                                 #{pr.number} {pr.title}
                               </button>
@@ -726,7 +727,6 @@ function CardDetailModal({ card, projectId, prRefreshKey, onClose, onDeleted, on
 export default function BoardPage() {
   const { projectId } = useParams<{ projectId: string }>()
   const pid = Number(projectId)
-  const navigate = useNavigate()
 
   const [boardData, setBoardData] = useState<BoardData>({ backlog: [], inProgress: [], done: [] })
   const [loading, setLoading] = useState(true)

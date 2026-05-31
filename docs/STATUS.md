@@ -56,6 +56,10 @@
   - [x] 4-3: `pull_request_review` Webhook → `PR_REVIEW_UPDATED` WebSocket 브로드캐스트 → 카드 PR 패널 자동 갱신
   - [x] 4-4: Diff 뷰어 (`GET /api/projects/{projectId}/pulls/{prNumber}/files`) — 파일별 unified diff 렌더링 (추가/삭제/컨텍스트 색상 구분)
   - [x] 4-5: 라인 코멘트 (`POST /api/projects/{projectId}/pulls/{prNumber}/comments`) — diff 라인 hover "+" 버튼 → 인라인 폼 → GitHub에 반영
+  - [x] 4-6: 브랜치 목록 조회 (`GET /api/projects/{projectId}/branches`) — DONE 카드에 연결된 브랜치 제외
+  - [x] 4-7: PR 생성 (`POST /api/projects/{projectId}/pulls`) — head/base 브랜치 선택, 제목/설명 입력 → GitHub에 직접 생성
+  - [x] 4-8: PR 머지 (`PUT /api/projects/{projectId}/pulls/{prNumber}/merge`) — merge/squash/rebase 선택, 충돌 시 에러 안내
+  - [x] 4-9: 카드 상세 PR 클릭 → 프로젝트 PR 페이지로 이동 (`?pr=번호` 쿼리 파라미터로 자동 탭 전환 + diff 펼침)
 - [ ] Docker 빌드
 - [ ] AWS 배포 (배포 전 체크리스트 → docs/DEPLOY.md)
 
@@ -89,6 +93,8 @@
 - [x] `src/store/` — AuthContext + AuthProvider (세션 복구)
 - [x] `src/types/project.ts` — Project, ProjectRole
 
-- [x] `src/api/pullrequest.ts` — getCardPullsApi / getProjectPullsApi / getPullFilesApi / createPrCommentApi
-- [x] `src/types/pullrequest.ts` — PullRequest / PullFile / ReviewerInfo / CreatePrCommentBody
+- [x] `src/api/pullrequest.ts` — getCardPullsApi / getProjectPullsApi / getPullFilesApi / createPrCommentApi / getRepoBranchesApi / createPrApi / mergePrApi
+- [x] `src/types/pullrequest.ts` — PullRequest (baseBranch 포함) / PullFile / ReviewerInfo / CreatePrCommentBody / CreatePrBody / MergePrBody
+- [x] `PullRequestsPage` — PR 생성 모달 (브랜치 드롭다운 / 제목·설명 입력), OPEN PR Merge 버튼 (방식 선택), `?pr=` 쿼리 파라미터로 자동 탭 전환 + diff 펼침
+- [x] `BoardPage` — 카드 상세 PR 제목 클릭 시 GitHub 대신 프로젝트 PR 페이지로 이동
 - [ ] 배포

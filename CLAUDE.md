@@ -151,15 +151,21 @@ X-Hub-Signature-256 검증 (실패 → 403)
 PR 데이터는 DB 저장 안 함. 백엔드가 GitHub API 중계.
 
 ```
-GET  /api/projects/{projectId}/cards/{cardId}/pulls      → 카드 브랜치별 PR + reviewer
-GET  /api/projects/{projectId}/pulls?state=all           → 프로젝트 전체 PR + reviewer
-GET  /api/projects/{projectId}/pulls/{prNumber}/files    → 변경 파일 + patch
-POST /api/projects/{projectId}/pulls/{prNumber}/comments → 라인 코멘트 GitHub 등록
+GET  /api/projects/{projectId}/branches                       → 브랜치 목록 (DONE 카드 연결 브랜치 제외)
+GET  /api/projects/{projectId}/cards/{cardId}/pulls           → 카드 브랜치별 PR + reviewer
+GET  /api/projects/{projectId}/pulls?state=all                → 프로젝트 전체 PR + reviewer
+GET  /api/projects/{projectId}/pulls/{prNumber}/files         → 변경 파일 + patch
+POST /api/projects/{projectId}/pulls                          → PR 생성 (head/base 브랜치, 제목, 설명)
+PUT  /api/projects/{projectId}/pulls/{prNumber}/merge         → PR 머지 (merge/squash/rebase)
+POST /api/projects/{projectId}/pulls/{prNumber}/comments      → 라인 코멘트 GitHub 등록
+POST /api/projects/{projectId}/pulls/{prNumber}/comments/{id}/replies → 코멘트 답글
 ```
 
 - 모든 메서드: `validateMember` → `projectGithubRepository` → Jasypt 복호화 토큰으로 GitHub API 호출
 - `RestClient` 필드 선언 (thread-safe)
 - `pull_request_review` Webhook → `PR_REVIEW_UPDATED` WebSocket 브로드캐스트
+- PR 머지 충돌(422) → `GITHUB_PR_CONFLICT` 에러 반환
+- 브랜치 목록: `CardBranchRepository.findBranchNamesByProjectIdAndCardStatus(DONE)`으로 완료 브랜치 제외
 
 ### JWT 인증 흐름
 Access Token (1h) + Refresh Token (7d) 발급. 만료 시 `POST /api/auth/refresh`. 둘 다 만료 시 재로그인.
