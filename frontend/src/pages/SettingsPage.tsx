@@ -4,7 +4,6 @@ import { useAuth } from '@/store/authStore'
 import {
   getInviteCodeApi,
   regenerateInviteCodeApi,
-  getMembersApi,
   kickMemberApi,
   leaveProjectApi,
   deleteProjectApi,
@@ -12,7 +11,7 @@ import {
   getOAuthRedirectUrlApi,
   syncGithubApi,
 } from '@/api/settings'
-import { getProjectApi, updateProjectApi } from '@/api/project'
+import { getProjectApi, updateProjectApi, getProjectMembersApi } from '@/api/project'
 
 const AVATAR_COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#3b82f6']
 const avatarColor = (id: number) => AVATAR_COLORS[id % AVATAR_COLORS.length]
@@ -147,7 +146,7 @@ export default function SettingsPage() {
     initializedProjectIdRef.current = pid
 
     Promise.all([
-      getMembersApi(pid),
+      getProjectMembersApi(pid),
       getInviteCodeApi(pid),
       getGithubConfigApi(pid),
       getProjectApi(pid),

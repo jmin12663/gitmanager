@@ -117,8 +117,8 @@ export default function ProfilePage() {
       setCurrentPassword('')
       setNewPassword('')
       setConfirmPassword('')
-    } catch (err: any) {
-      const code = err?.response?.data?.error?.code
+    } catch (err: unknown) {
+      const code = (err as { response?: { data?: { error?: { code?: string } } } })?.response?.data?.error?.code
       if (code === 'WRONG_PASSWORD') {
         setPwMsg({ type: 'err', text: '현재 비밀번호가 올바르지 않습니다.' })
       } else {

@@ -6,9 +6,6 @@ export const getInviteCodeApi = (projectId: number) =>
 export const regenerateInviteCodeApi = (projectId: number) =>
   client.post(`/projects/${projectId}/invite-code/regenerate`)
 
-export const getMembersApi = (projectId: number) =>
-  client.get(`/projects/${projectId}/members`)
-
 export const kickMemberApi = (projectId: number, targetUserId: number) =>
   client.delete(`/projects/${projectId}/members/${targetUserId}`)
 

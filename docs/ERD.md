@@ -69,7 +69,6 @@ CREATE TABLE refresh_tokens (
     id         BIGINT       NOT NULL AUTO_INCREMENT,
     user_id    BIGINT       NOT NULL,
     token_hash VARCHAR(255) NOT NULL UNIQUE,
-    is_used    BOOLEAN      NOT NULL DEFAULT FALSE,
     expires_at DATETIME(6)  NOT NULL,
     created_at DATETIME(6)  NOT NULL,
     PRIMARY KEY (id),
