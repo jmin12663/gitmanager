@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
 import { useBoardSocket, type BoardSocketMessage } from '@/hooks/useBoardSocket'
 import {
   DndContext,
@@ -626,14 +626,12 @@ function CardDetailModal({ card, projectId, prRefreshKey, onClose, onDeleted, on
                               <span className={`card-pr-badge card-pr-badge--${pr.state.toLowerCase()}`}>
                                 {pr.state}
                               </span>
-                              <a
-                                href={pr.htmlUrl}
-                                target="_blank"
-                                rel="noreferrer"
+                              <button
                                 className="card-pr-title"
+                                onClick={() => navigate(`/projects/${pid}/pulls?pr=${pr.number}`)}
                               >
                                 #{pr.number} {pr.title}
-                              </a>
+                              </button>
                             </div>
                             <div className="card-pr-meta">
                               <span className="card-pr-branch">{pr.branchName}</span>
@@ -728,6 +726,7 @@ function CardDetailModal({ card, projectId, prRefreshKey, onClose, onDeleted, on
 export default function BoardPage() {
   const { projectId } = useParams<{ projectId: string }>()
   const pid = Number(projectId)
+  const navigate = useNavigate()
 
   const [boardData, setBoardData] = useState<BoardData>({ backlog: [], inProgress: [], done: [] })
   const [loading, setLoading] = useState(true)

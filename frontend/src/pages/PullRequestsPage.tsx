@@ -1,5 +1,5 @@
-import { useState, useEffect, useMemo } from 'react'
-import { useParams } from 'react-router-dom'
+import { useState, useEffect, useMemo, useRef } from 'react'
+import { useParams, useSearchParams } from 'react-router-dom'
 import { getProjectPullsApi, getPullFilesApi, getPrCommentsApi, createPrCommentApi, createPrCommentReplyApi, getRepoBranchesApi, createPrApi, mergePrApi } from '@/api/pullrequest'
 import type { PullFile, PullRequest, PrLineComment, MergePrBody } from '@/types/pullrequest'
 
@@ -451,11 +451,18 @@ function MergeButton({ projectId, pr, onMerged }: { projectId: number; pr: PullR
   )
 }
 
-function PrItem({ pr, projectId, onMerged }: { pr: PullRequest; projectId: number; onMerged: () => void }) {
-  const [showDiff, setShowDiff] = useState(false)
+function PrItem({ pr, projectId, onMerged, autoOpen }: { pr: PullRequest; projectId: number; onMerged: () => void; autoOpen?: boolean }) {
+  const [showDiff, setShowDiff] = useState(autoOpen ?? false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (autoOpen && ref.current) {
+      ref.current.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+  }, [autoOpen])
 
   return (
-    <div className={`pr-item${showDiff ? ' pr-item--expanded' : ''}`}>
+    <div ref={ref} className={`pr-item${showDiff ? ' pr-item--expanded' : ''}`}>
       <div className="pr-item-top">
         <div className="pr-item-left">
           <span className={`pr-badge pr-badge--${pr.state.toLowerCase()}`}>{pr.state}</span>
@@ -479,15 +486,15 @@ function PrItem({ pr, projectId, onMerged }: { pr: PullRequest; projectId: numbe
               </div>
             </div>
             <div className="pr-item-actions">
-              {pr.state === 'OPEN' && (
-                <MergeButton projectId={projectId} pr={pr} onMerged={onMerged} />
-              )}
               <button
                 className={`pr-diff-toggle-btn${showDiff ? ' active' : ''}`}
                 onClick={() => setShowDiff(v => !v)}
               >
                 {showDiff ? '코드 숨기기' : '코드 보기'}
               </button>
+              {pr.state === 'OPEN' && (
+                <MergeButton projectId={projectId} pr={pr} onMerged={onMerged} />
+              )}
               <a href={pr.htmlUrl} target="_blank" rel="noreferrer" className="pr-item-link">
                 GitHub ↗
               </a>
@@ -605,6 +612,8 @@ function CreatePrModal({ projectId, onClose, onCreated }: { projectId: number; o
 export default function PullRequestsPage() {
   const { projectId } = useParams<{ projectId: string }>()
   const pid = Number(projectId)
+  const [searchParams] = useSearchParams()
+  const targetPrNumber = searchParams.get('pr') ? Number(searchParams.get('pr')) : null
 
   const [tab, setTab] = useState<TabState>('open')
   const [pulls, setPulls] = useState<PullRequest[]>([])
@@ -624,6 +633,13 @@ export default function PullRequestsPage() {
           closed: all.filter(p => p.state === 'CLOSED').length,
         })
         setPulls(all)
+
+        if (targetPrNumber) {
+          const target = all.find(p => p.number === targetPrNumber)
+          if (target) {
+            setTab(target.state.toLowerCase() as TabState)
+          }
+        }
       })
       .catch(() => {})
       .finally(() => setLoading(false))
@@ -673,7 +689,7 @@ export default function PullRequestsPage() {
       ) : (
         <div className="pr-list">
           {filtered.map(pr => (
-            <PrItem key={pr.number} pr={pr} projectId={pid} onMerged={loadPulls} />
+            <PrItem key={pr.number} pr={pr} projectId={pid} onMerged={loadPulls} autoOpen={pr.number === targetPrNumber} />
           ))}
         </div>
       )}

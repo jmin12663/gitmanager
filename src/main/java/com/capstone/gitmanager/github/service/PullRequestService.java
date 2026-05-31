@@ -1,6 +1,8 @@
 package com.capstone.gitmanager.github.service;
 
 import com.capstone.gitmanager.board.entity.Card;
+import com.capstone.gitmanager.board.entity.CardStatus;
+import com.capstone.gitmanager.board.repository.CardBranchRepository;
 import com.capstone.gitmanager.board.repository.CardRepository;
 import com.capstone.gitmanager.common.exception.CustomException;
 import com.capstone.gitmanager.common.exception.ErrorCode;
@@ -29,6 +31,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Slf4j
 @Service
@@ -38,6 +41,7 @@ public class PullRequestService {
 
     private final ProjectGithubRepository projectGithubRepository;
     private final CardRepository cardRepository;
+    private final CardBranchRepository cardBranchRepository;
     private final UserProjectRepository userProjectRepository;
     private final StringEncryptor jasyptStringEncryptor;
 
@@ -188,6 +192,8 @@ public class PullRequestService {
         String owner = parseRepoOwner(github.getRepoUrl());
         String repoName = github.getRepoName();
 
+        Set<String> doneBranches = cardBranchRepository.findBranchNamesByProjectIdAndCardStatus(projectId, CardStatus.DONE);
+
         try {
             List<Map<String, Object>> res = restClient.get()
                     .uri("https://api.github.com/repos/{owner}/{repo}/branches?per_page=100", owner, repoName)
@@ -196,7 +202,10 @@ public class PullRequestService {
                     .retrieve()
                     .body(new ParameterizedTypeReference<>() {});
             if (res == null) return List.of();
-            return res.stream().map(b -> (String) b.get("name")).toList();
+            return res.stream()
+                    .map(b -> (String) b.get("name"))
+                    .filter(name -> !doneBranches.contains(name))
+                    .toList();
         } catch (Exception e) {
             log.warn("[PR] 브랜치 목록 조회 실패. error={}", e.getMessage());
             return List.of();
