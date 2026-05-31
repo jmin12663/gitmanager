@@ -3,6 +3,8 @@ package com.capstone.gitmanager.github.controller;
 import com.capstone.gitmanager.common.dto.ApiResponse;
 import com.capstone.gitmanager.github.dto.CreatePrCommentRequest;
 import com.capstone.gitmanager.github.dto.CreatePrCommentReplyRequest;
+import com.capstone.gitmanager.github.dto.CreatePrRequest;
+import com.capstone.gitmanager.github.dto.MergePrRequest;
 import com.capstone.gitmanager.github.dto.PrLineCommentResponse;
 import com.capstone.gitmanager.github.dto.PullFileResponse;
 import com.capstone.gitmanager.github.dto.PullRequestResponse;
@@ -27,6 +29,34 @@ public class PullRequestController {
             @AuthenticationPrincipal Long userId
     ) {
         return ApiResponse.ok(pullRequestService.getCardPulls(projectId, cardId, userId));
+    }
+
+    @GetMapping("/api/projects/{projectId}/branches")
+    public ApiResponse<List<String>> getRepoBranches(
+            @PathVariable Long projectId,
+            @AuthenticationPrincipal Long userId
+    ) {
+        return ApiResponse.ok(pullRequestService.getRepoBranches(projectId, userId));
+    }
+
+    @PostMapping("/api/projects/{projectId}/pulls")
+    public ApiResponse<PullRequestResponse> createPr(
+            @PathVariable Long projectId,
+            @RequestBody @Valid CreatePrRequest request,
+            @AuthenticationPrincipal Long userId
+    ) {
+        return ApiResponse.ok(pullRequestService.createPr(projectId, request, userId));
+    }
+
+    @PutMapping("/api/projects/{projectId}/pulls/{prNumber}/merge")
+    public ApiResponse<Void> mergePr(
+            @PathVariable Long projectId,
+            @PathVariable int prNumber,
+            @RequestBody @Valid MergePrRequest request,
+            @AuthenticationPrincipal Long userId
+    ) {
+        pullRequestService.mergePr(projectId, prNumber, request, userId);
+        return ApiResponse.ok(null);
     }
 
     @GetMapping("/api/projects/{projectId}/pulls")

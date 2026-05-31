@@ -6,6 +6,8 @@ import com.capstone.gitmanager.common.exception.CustomException;
 import com.capstone.gitmanager.common.exception.ErrorCode;
 import com.capstone.gitmanager.github.dto.CreatePrCommentRequest;
 import com.capstone.gitmanager.github.dto.CreatePrCommentReplyRequest;
+import com.capstone.gitmanager.github.dto.CreatePrRequest;
+import com.capstone.gitmanager.github.dto.MergePrRequest;
 import com.capstone.gitmanager.github.dto.PrLineCommentResponse;
 import com.capstone.gitmanager.github.dto.PullFileResponse;
 import com.capstone.gitmanager.github.dto.PullRequestResponse;
@@ -21,7 +23,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestClient;
 
+import org.springframework.web.client.HttpClientErrorException;
+
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -170,6 +175,105 @@ public class PullRequestService {
         } catch (Exception e) {
             log.warn("[PR] 답글 등록 실패. prNumber={}, commentId={}, error={}", prNumber, commentId, e.getMessage());
             throw new CustomException(ErrorCode.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    public List<String> getRepoBranches(Long projectId, Long userId) {
+        validateMember(projectId, userId);
+
+        ProjectGithub github = projectGithubRepository.findById(projectId)
+                .orElseThrow(() -> new CustomException(ErrorCode.GITHUB_NOT_CONFIGURED));
+
+        String accessToken = jasyptStringEncryptor.decrypt(github.getOauthTokenEncrypted());
+        String owner = parseRepoOwner(github.getRepoUrl());
+        String repoName = github.getRepoName();
+
+        try {
+            List<Map<String, Object>> res = restClient.get()
+                    .uri("https://api.github.com/repos/{owner}/{repo}/branches?per_page=100", owner, repoName)
+                    .header("Authorization", "Bearer " + accessToken)
+                    .header("Accept", "application/vnd.github+json")
+                    .retrieve()
+                    .body(new ParameterizedTypeReference<>() {});
+            if (res == null) return List.of();
+            return res.stream().map(b -> (String) b.get("name")).toList();
+        } catch (Exception e) {
+            log.warn("[PR] 브랜치 목록 조회 실패. error={}", e.getMessage());
+            return List.of();
+        }
+    }
+
+    @Transactional
+    public PullRequestResponse createPr(Long projectId, CreatePrRequest request, Long userId) {
+        validateMember(projectId, userId);
+
+        ProjectGithub github = projectGithubRepository.findById(projectId)
+                .orElseThrow(() -> new CustomException(ErrorCode.GITHUB_NOT_CONFIGURED));
+
+        String accessToken = jasyptStringEncryptor.decrypt(github.getOauthTokenEncrypted());
+        String owner = parseRepoOwner(github.getRepoUrl());
+        String repoName = github.getRepoName();
+
+        Map<String, Object> body = new HashMap<>();
+        body.put("title", request.title());
+        body.put("head", request.head());
+        body.put("base", request.base());
+        if (request.body() != null && !request.body().isBlank()) {
+            body.put("body", request.body());
+        }
+
+        try {
+            Map<String, Object> created = restClient.post()
+                    .uri("https://api.github.com/repos/{owner}/{repo}/pulls", owner, repoName)
+                    .header("Authorization", "Bearer " + accessToken)
+                    .header("Accept", "application/vnd.github+json")
+                    .body(body)
+                    .retrieve()
+                    .body(new ParameterizedTypeReference<>() {});
+            if (created == null) throw new CustomException(ErrorCode.INTERNAL_SERVER_ERROR);
+            int prNumber = ((Number) created.get("number")).intValue();
+            List<Map<String, Object>> reviews = fetchReviews(owner, repoName, prNumber, accessToken);
+            return PullRequestResponse.from(created, reviews);
+        } catch (CustomException e) {
+            throw e;
+        } catch (HttpClientErrorException e) {
+            log.warn("[PR] PR 생성 실패. head={}, base={}, status={}, error={}",
+                    request.head(), request.base(), e.getStatusCode(), e.getMessage());
+            throw new CustomException(ErrorCode.GITHUB_API_ERROR);
+        } catch (Exception e) {
+            log.warn("[PR] PR 생성 실패. head={}, base={}, error={}", request.head(), request.base(), e.getMessage());
+            throw new CustomException(ErrorCode.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    @Transactional
+    public void mergePr(Long projectId, int prNumber, MergePrRequest request, Long userId) {
+        validateMember(projectId, userId);
+
+        ProjectGithub github = projectGithubRepository.findById(projectId)
+                .orElseThrow(() -> new CustomException(ErrorCode.GITHUB_NOT_CONFIGURED));
+
+        String accessToken = jasyptStringEncryptor.decrypt(github.getOauthTokenEncrypted());
+        String owner = parseRepoOwner(github.getRepoUrl());
+        String repoName = github.getRepoName();
+
+        try {
+            restClient.put()
+                    .uri("https://api.github.com/repos/{owner}/{repo}/pulls/{prNumber}/merge",
+                            owner, repoName, prNumber)
+                    .header("Authorization", "Bearer " + accessToken)
+                    .header("Accept", "application/vnd.github+json")
+                    .body(Map.of("merge_method", request.mergeMethod()))
+                    .retrieve()
+                    .toBodilessEntity();
+        } catch (HttpClientErrorException.UnprocessableEntity e) {
+            log.warn("[PR] 머지 충돌. prNumber={}, error={}", prNumber, e.getMessage());
+            throw new CustomException(ErrorCode.GITHUB_PR_CONFLICT);
+        } catch (CustomException e) {
+            throw e;
+        } catch (Exception e) {
+            log.warn("[PR] 머지 실패. prNumber={}, error={}", prNumber, e.getMessage());
+            throw new CustomException(ErrorCode.GITHUB_API_ERROR);
         }
     }
 

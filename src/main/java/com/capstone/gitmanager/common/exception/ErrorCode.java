@@ -45,6 +45,8 @@ public enum ErrorCode {
     GITHUB_NOT_CONFIGURED(HttpStatus.BAD_REQUEST, "GITHUB_NOT_CONFIGURED", "GitHub 연동이 설정되지 않았습니다."),
     WEBHOOK_SIGNATURE_INVALID(HttpStatus.FORBIDDEN, "WEBHOOK_SIGNATURE_INVALID", "Webhook 서명이 유효하지 않습니다."),
     GITHUB_OAUTH_FAILED(HttpStatus.BAD_REQUEST, "GITHUB_OAUTH_FAILED", "GitHub OAuth 인증에 실패했습니다."),
+    GITHUB_PR_CONFLICT(HttpStatus.UNPROCESSABLE_ENTITY, "GITHUB_PR_CONFLICT", "PR 머지 충돌이 발생했습니다. 로컬에서 충돌을 해결 후 다시 시도해 주세요."),
+    GITHUB_API_ERROR(HttpStatus.BAD_REQUEST, "GITHUB_API_ERROR", "GitHub API 요청에 실패했습니다."),
 
     // File
     INVALID_FILE_TYPE(HttpStatus.BAD_REQUEST, "INVALID_FILE_TYPE", "허용되지 않는 파일 형식입니다."),

@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useParams } from 'react-router-dom'
-import { getProjectPullsApi, getPullFilesApi, getPrCommentsApi, createPrCommentApi, createPrCommentReplyApi } from '@/api/pullrequest'
-import type { PullFile, PullRequest, PrLineComment } from '@/types/pullrequest'
+import { getProjectPullsApi, getPullFilesApi, getPrCommentsApi, createPrCommentApi, createPrCommentReplyApi, getRepoBranchesApi, createPrApi, mergePrApi } from '@/api/pullrequest'
+import type { PullFile, PullRequest, PrLineComment, MergePrBody } from '@/types/pullrequest'
 
 type TabState = 'open' | 'draft' | 'merged' | 'closed'
 
@@ -393,7 +393,65 @@ function PrDiffPanel({ projectId, pr }: { projectId: number; pr: PullRequest }) 
   )
 }
 
-function PrItem({ pr, projectId }: { pr: PullRequest; projectId: number }) {
+function MergeButton({ projectId, pr, onMerged }: { projectId: number; pr: PullRequest; onMerged: () => void }) {
+  const [open, setOpen] = useState(false)
+  const [mergeMethod, setMergeMethod] = useState<MergePrBody['mergeMethod']>('merge')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+
+  const LABELS: Record<MergePrBody['mergeMethod'], string> = {
+    merge: 'Merge commit',
+    squash: 'Squash and merge',
+    rebase: 'Rebase and merge',
+  }
+
+  async function handleMerge() {
+    setLoading(true)
+    setError('')
+    try {
+      await mergePrApi(projectId, pr.number, { mergeMethod })
+      setOpen(false)
+      onMerged()
+    } catch (e: any) {
+      const msg = e?.response?.data?.error?.message
+      setError(msg ?? '머지에 실패했습니다.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (!open) {
+    return (
+      <button className="pr-merge-btn" onClick={() => setOpen(true)}>
+        Merge
+      </button>
+    )
+  }
+
+  return (
+    <div className="pr-merge-panel">
+      <select
+        className="pr-merge-select"
+        value={mergeMethod}
+        onChange={e => setMergeMethod(e.target.value as MergePrBody['mergeMethod'])}
+        disabled={loading}
+      >
+        {(Object.keys(LABELS) as MergePrBody['mergeMethod'][]).map(m => (
+          <option key={m} value={m}>{LABELS[m]}</option>
+        ))}
+      </select>
+      <button className="pr-merge-confirm-btn" onClick={handleMerge} disabled={loading}>
+        {loading ? '머지 중...' : '확인'}
+      </button>
+      <button className="pr-merge-cancel-btn" onClick={() => { setOpen(false); setError('') }} disabled={loading}>
+        취소
+      </button>
+      {error && <span className="pr-merge-error">{error}</span>}
+    </div>
+  )
+}
+
+function PrItem({ pr, projectId, onMerged }: { pr: PullRequest; projectId: number; onMerged: () => void }) {
   const [showDiff, setShowDiff] = useState(false)
 
   return (
@@ -408,6 +466,12 @@ function PrItem({ pr, projectId }: { pr: PullRequest; projectId: number }) {
               </a>
               <div className="pr-item-meta">
                 <span className="pr-item-branch">{pr.branchName}</span>
+                {pr.baseBranch && (
+                  <>
+                    <span className="pr-item-dot">→</span>
+                    <span className="pr-item-branch">{pr.baseBranch}</span>
+                  </>
+                )}
                 <span className="pr-item-dot">·</span>
                 <span>{pr.author}</span>
                 <span className="pr-item-dot">·</span>
@@ -415,6 +479,9 @@ function PrItem({ pr, projectId }: { pr: PullRequest; projectId: number }) {
               </div>
             </div>
             <div className="pr-item-actions">
+              {pr.state === 'OPEN' && (
+                <MergeButton projectId={projectId} pr={pr} onMerged={onMerged} />
+              )}
               <button
                 className={`pr-diff-toggle-btn${showDiff ? ' active' : ''}`}
                 onClick={() => setShowDiff(v => !v)}
@@ -434,6 +501,107 @@ function PrItem({ pr, projectId }: { pr: PullRequest; projectId: number }) {
   )
 }
 
+function CreatePrModal({ projectId, onClose, onCreated }: { projectId: number; onClose: () => void; onCreated: (pr: PullRequest) => void }) {
+  const [branches, setBranches] = useState<string[]>([])
+  const [title, setTitle] = useState('')
+  const [body, setBody] = useState('')
+  const [head, setHead] = useState('')
+  const [base, setBase] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [branchLoading, setBranchLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    getRepoBranchesApi(projectId)
+      .then(res => {
+        const list = res.data.data
+        setBranches(list)
+        if (list.length > 0) setHead(list[0])
+        const main = list.find(b => b === 'main') ?? list.find(b => b === 'master') ?? (list.length > 1 ? list[1] : list[0] ?? '')
+        setBase(main)
+      })
+      .catch(() => {})
+      .finally(() => setBranchLoading(false))
+  }, [projectId])
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!title.trim() || !head || !base) return
+    if (head === base) { setError('head 브랜치와 base 브랜치가 같습니다.'); return }
+    setLoading(true)
+    setError('')
+    try {
+      const res = await createPrApi(projectId, { title: title.trim(), body: body.trim() || undefined, head, base })
+      onCreated(res.data.data)
+      onClose()
+    } catch (e: any) {
+      const msg = e?.response?.data?.error?.message
+      setError(msg ?? 'PR 생성에 실패했습니다.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="gm-modal-overlay" onClick={onClose}>
+      <div className="gm-modal pr-create-modal" onClick={e => e.stopPropagation()}>
+        <button className="gm-modal-close" onClick={onClose}>×</button>
+        <div className="gm-modal-title">Pull Request 생성</div>
+        {branchLoading ? (
+          <div className="pr-loading">브랜치 목록 불러오는 중...</div>
+        ) : (
+          <form className="pr-create-form" onSubmit={handleSubmit}>
+            <div className="pr-create-branches">
+              <div className="pr-create-field">
+                <label className="pr-create-label">compare (head)</label>
+                <select className="pr-create-select" value={head} onChange={e => setHead(e.target.value)} disabled={loading}>
+                  {branches.map(b => <option key={b} value={b}>{b}</option>)}
+                </select>
+              </div>
+              <span className="pr-create-arrow">→</span>
+              <div className="pr-create-field">
+                <label className="pr-create-label">base</label>
+                <select className="pr-create-select" value={base} onChange={e => setBase(e.target.value)} disabled={loading}>
+                  {branches.map(b => <option key={b} value={b}>{b}</option>)}
+                </select>
+              </div>
+            </div>
+            <div className="pr-create-field">
+              <label className="pr-create-label">제목 *</label>
+              <input
+                className="pr-create-input"
+                value={title}
+                onChange={e => setTitle(e.target.value)}
+                placeholder="PR 제목을 입력하세요"
+                disabled={loading}
+                required
+              />
+            </div>
+            <div className="pr-create-field">
+              <label className="pr-create-label">설명</label>
+              <textarea
+                className="pr-create-textarea"
+                value={body}
+                onChange={e => setBody(e.target.value)}
+                placeholder="PR 설명을 입력하세요 (선택)"
+                rows={4}
+                disabled={loading}
+              />
+            </div>
+            {error && <div className="pr-create-error">{error}</div>}
+            <div className="pr-create-actions">
+              <button type="button" className="pr-create-cancel" onClick={onClose} disabled={loading}>취소</button>
+              <button type="submit" className="pr-create-submit" disabled={loading || !title.trim() || head === base}>
+                {loading ? '생성 중...' : 'PR 생성'}
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export default function PullRequestsPage() {
   const { projectId } = useParams<{ projectId: string }>()
   const pid = Number(projectId)
@@ -442,8 +610,9 @@ export default function PullRequestsPage() {
   const [pulls, setPulls] = useState<PullRequest[]>([])
   const [loading, setLoading] = useState(false)
   const [counts, setCounts] = useState<Record<TabState, number>>({ open: 0, draft: 0, merged: 0, closed: 0 })
+  const [showCreateModal, setShowCreateModal] = useState(false)
 
-  useEffect(() => {
+  function loadPulls() {
     setLoading(true)
     getProjectPullsApi(pid, 'all')
       .then(res => {
@@ -458,9 +627,19 @@ export default function PullRequestsPage() {
       })
       .catch(() => {})
       .finally(() => setLoading(false))
+  }
+
+  useEffect(() => {
+    loadPulls()
   }, [pid])
 
   const filtered = pulls.filter(p => p.state === tab.toUpperCase())
+
+  function handleCreated(pr: PullRequest) {
+    setPulls(prev => [pr, ...prev])
+    setCounts(prev => ({ ...prev, open: prev.open + 1 }))
+    setTab('open')
+  }
 
   return (
     <div className="pr-page">
@@ -469,6 +648,9 @@ export default function PullRequestsPage() {
           <GitPrIcon />
           <h2 className="pr-title">Pull Requests</h2>
         </div>
+        <button className="pr-create-btn" onClick={() => setShowCreateModal(true)}>
+          + PR 생성
+        </button>
       </div>
 
       <div className="pr-tabs">
@@ -491,9 +673,17 @@ export default function PullRequestsPage() {
       ) : (
         <div className="pr-list">
           {filtered.map(pr => (
-            <PrItem key={pr.number} pr={pr} projectId={pid} />
+            <PrItem key={pr.number} pr={pr} projectId={pid} onMerged={loadPulls} />
           ))}
         </div>
+      )}
+
+      {showCreateModal && (
+        <CreatePrModal
+          projectId={pid}
+          onClose={() => setShowCreateModal(false)}
+          onCreated={handleCreated}
+        />
       )}
     </div>
   )

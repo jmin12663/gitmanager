@@ -20,7 +20,19 @@ export interface PullRequest {
   reviewers: ReviewerInfo[]
   createdAt: string
   branchName: string
+  baseBranch: string
   headSha: string
+}
+
+export interface CreatePrBody {
+  title: string
+  body?: string
+  head: string
+  base: string
+}
+
+export interface MergePrBody {
+  mergeMethod: 'merge' | 'squash' | 'rebase'
 }
 
 export interface CreatePrCommentBody {

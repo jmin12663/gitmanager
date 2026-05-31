@@ -2277,6 +2277,38 @@ html, body, #root {
 .pr-item-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 .pr-diff-toggle-btn { font-size: 12px; padding: 3px 10px; border-radius: 6px; border: 1px solid var(--gm-border2); background: var(--gm-bg3); color: var(--gm-text2); cursor: pointer; white-space: nowrap; }
 .pr-diff-toggle-btn:hover, .pr-diff-toggle-btn.active { border-color: var(--gm-accent); color: var(--gm-accent2); background: var(--gm-accent-bg); }
+
+/* PR 생성 버튼 */
+.pr-create-btn { font-size: 13px; padding: 6px 14px; border-radius: 6px; border: 1px solid var(--gm-accent); background: var(--gm-accent); color: #fff; cursor: pointer; font-weight: 500; white-space: nowrap; }
+.pr-create-btn:hover { opacity: 0.85; }
+
+/* Merge 버튼 */
+.pr-merge-btn { font-size: 12px; padding: 3px 10px; border-radius: 6px; border: 1px solid #2ea043; background: #238636; color: #fff; cursor: pointer; white-space: nowrap; font-weight: 500; }
+.pr-merge-btn:hover { background: #2ea043; }
+.pr-merge-panel { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.pr-merge-select { font-size: 12px; padding: 3px 6px; border-radius: 6px; border: 1px solid var(--gm-border2); background: var(--gm-bg3); color: var(--gm-text1); cursor: pointer; }
+.pr-merge-confirm-btn { font-size: 12px; padding: 3px 10px; border-radius: 6px; border: 1px solid #2ea043; background: #238636; color: #fff; cursor: pointer; font-weight: 500; }
+.pr-merge-confirm-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.pr-merge-cancel-btn { font-size: 12px; padding: 3px 10px; border-radius: 6px; border: 1px solid var(--gm-border2); background: var(--gm-bg3); color: var(--gm-text2); cursor: pointer; }
+.pr-merge-error { font-size: 11px; color: #f85149; }
+
+/* PR 생성 모달 */
+.pr-create-modal { width: 540px; }
+.pr-create-form { display: flex; flex-direction: column; gap: 16px; }
+.pr-create-branches { display: flex; align-items: flex-end; gap: 10px; }
+.pr-create-arrow { font-size: 16px; color: var(--gm-text3); padding-bottom: 4px; flex-shrink: 0; }
+.pr-create-field { display: flex; flex-direction: column; gap: 5px; flex: 1; }
+.pr-create-label { font-size: 12px; font-weight: 500; color: var(--gm-text2); }
+.pr-create-select { font-size: 13px; padding: 7px 10px; border-radius: 6px; border: 1px solid var(--gm-border2); background: var(--gm-bg3); color: var(--gm-text1); cursor: pointer; width: 100%; }
+.pr-create-input { font-size: 13px; padding: 7px 10px; border-radius: 6px; border: 1px solid var(--gm-border2); background: var(--gm-bg3); color: var(--gm-text1); outline: none; width: 100%; box-sizing: border-box; }
+.pr-create-input:focus { border-color: var(--gm-accent); }
+.pr-create-textarea { font-size: 13px; padding: 7px 10px; border-radius: 6px; border: 1px solid var(--gm-border2); background: var(--gm-bg3); color: var(--gm-text1); outline: none; resize: vertical; width: 100%; box-sizing: border-box; font-family: inherit; }
+.pr-create-textarea:focus { border-color: var(--gm-accent); }
+.pr-create-error { font-size: 12px; color: #f85149; }
+.pr-create-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
+.pr-create-cancel { font-size: 13px; padding: 7px 16px; border-radius: 6px; border: 1px solid var(--gm-border2); background: var(--gm-bg3); color: var(--gm-text2); cursor: pointer; }
+.pr-create-submit { font-size: 13px; padding: 7px 16px; border-radius: 6px; border: 1px solid var(--gm-accent); background: var(--gm-accent); color: #fff; cursor: pointer; font-weight: 500; }
+.pr-create-submit:disabled { opacity: 0.5; cursor: not-allowed; }
 .diff-loading { font-size: 12px; color: var(--gm-text3); padding: 12px 0; }
 .diff-panel { border-top: 1px solid var(--gm-border); padding-top: 12px; display: flex; flex-direction: column; gap: 6px; }
 .diff-block { overflow-x: auto; font-family: monospace; font-size: 13px; line-height: 1.6; }

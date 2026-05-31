@@ -14,6 +14,7 @@ public record PullRequestResponse(
         List<ReviewerInfo> reviewers,
         String createdAt,
         String branchName,
+        String baseBranch,
         String headSha
 ) {
     public record ReviewerInfo(String login, String state) {}
@@ -47,6 +48,12 @@ public record PullRequestResponse(
             headSha = (String) head.getOrDefault("sha", "");
         }
 
+        String baseBranch = "";
+        Map<String, Object> base = (Map<String, Object>) pr.get("base");
+        if (base != null) {
+            baseBranch = (String) base.getOrDefault("ref", "");
+        }
+
         List<ReviewerInfo> reviewerInfos = buildReviewerInfos(pr, reviews);
 
         return new PullRequestResponse(
@@ -58,6 +65,7 @@ public record PullRequestResponse(
                 reviewerInfos,
                 (String) pr.getOrDefault("created_at", ""),
                 branchName,
+                baseBranch,
                 headSha
         );
     }

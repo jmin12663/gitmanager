@@ -1,5 +1,22 @@
 import client from './client'
-import type { CreatePrCommentBody, PrLineComment, PullFile, PullRequest } from '@/types/pullrequest'
+import type { CreatePrBody, CreatePrCommentBody, MergePrBody, PrLineComment, PullFile, PullRequest } from '@/types/pullrequest'
+
+export const getRepoBranchesApi = (projectId: number) =>
+  client.get<{ success: boolean; data: string[] }>(
+    `/projects/${projectId}/branches`
+  )
+
+export const createPrApi = (projectId: number, body: CreatePrBody) =>
+  client.post<{ success: boolean; data: PullRequest }>(
+    `/projects/${projectId}/pulls`,
+    body
+  )
+
+export const mergePrApi = (projectId: number, prNumber: number, body: MergePrBody) =>
+  client.put<{ success: boolean; data: null }>(
+    `/projects/${projectId}/pulls/${prNumber}/merge`,
+    body
+  )
 
 export const getCardPullsApi = (projectId: number, cardId: number) =>
   client.get<{ success: boolean; data: PullRequest[] }>(
