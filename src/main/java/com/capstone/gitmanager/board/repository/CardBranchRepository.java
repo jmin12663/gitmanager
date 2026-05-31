@@ -17,6 +17,6 @@ public interface CardBranchRepository extends JpaRepository<CardBranch, CardBran
 
     Optional<CardBranch> findByRepoNameAndIdBranchName(String repoName, String branchName);
 
-    @Query("SELECT cb.id.branchName FROM CardBranch cb JOIN Card c ON cb.cardId = c.id WHERE c.projectId = :projectId AND c.status = :status")
+    @Query("SELECT cb.id.branchName FROM CardBranch cb WHERE cb.cardId IN (SELECT c.id FROM Card c WHERE c.projectId = :projectId AND c.status = :status)")
     Set<String> findBranchNamesByProjectIdAndCardStatus(@Param("projectId") Long projectId, @Param("status") CardStatus status);
 }

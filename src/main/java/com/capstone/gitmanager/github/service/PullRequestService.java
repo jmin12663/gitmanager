@@ -23,9 +23,8 @@ import org.jasypt.encryption.StringEncryptor;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.client.RestClient;
-
 import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.RestClient;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -212,7 +211,6 @@ public class PullRequestService {
         }
     }
 
-    @Transactional
     public PullRequestResponse createPr(Long projectId, CreatePrRequest request, Long userId) {
         validateMember(projectId, userId);
 
@@ -255,7 +253,6 @@ public class PullRequestService {
         }
     }
 
-    @Transactional
     public void mergePr(Long projectId, int prNumber, MergePrRequest request, Long userId) {
         validateMember(projectId, userId);
 
