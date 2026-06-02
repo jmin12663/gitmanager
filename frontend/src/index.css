@@ -2291,6 +2291,12 @@ html, body, #root {
 .pr-merge-confirm-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .pr-merge-cancel-btn { font-size: 12px; padding: 3px 10px; border-radius: 6px; border: 1px solid var(--gm-border2); background: var(--gm-bg3); color: var(--gm-text2); cursor: pointer; }
 .pr-merge-error { font-size: 11px; color: #f85149; }
+.pr-close-btn { font-size: 12px; padding: 3px 10px; border-radius: 6px; border: 1px solid #6e7681; background: transparent; color: var(--gm-text2); cursor: pointer; white-space: nowrap; font-weight: 500; }
+.pr-close-btn:hover { background: var(--gm-bg3); color: var(--gm-text1); border-color: var(--gm-text2); }
+.pr-close-panel { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.pr-close-confirm-text { font-size: 12px; color: var(--gm-text2); white-space: nowrap; }
+.pr-close-confirm-btn { font-size: 12px; padding: 3px 10px; border-radius: 6px; border: 1px solid #f85149; background: #da3633; color: #fff; cursor: pointer; font-weight: 500; }
+.pr-close-confirm-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 /* PR 생성 모달 */
 .pr-create-modal { width: 540px; }

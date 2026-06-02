@@ -48,6 +48,16 @@ public class PullRequestController {
         return ApiResponse.ok(pullRequestService.createPr(projectId, request, userId));
     }
 
+    @PatchMapping("/api/projects/{projectId}/pulls/{prNumber}/close")
+    public ApiResponse<Void> closePr(
+            @PathVariable Long projectId,
+            @PathVariable int prNumber,
+            @AuthenticationPrincipal Long userId
+    ) {
+        pullRequestService.closePr(projectId, prNumber, userId);
+        return ApiResponse.ok(null);
+    }
+
     @PutMapping("/api/projects/{projectId}/pulls/{prNumber}/merge")
     public ApiResponse<Void> mergePr(
             @PathVariable Long projectId,

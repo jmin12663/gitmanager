@@ -49,3 +49,8 @@ export const createPrCommentReplyApi = (projectId: number, prNumber: number, com
     `/projects/${projectId}/pulls/${prNumber}/comments/${commentId}/replies`,
     { body }
   )
+
+export const closePrApi = (projectId: number, prNumber: number) =>
+  client.patch<{ success: boolean; data: null }>(
+    `/projects/${projectId}/pulls/${prNumber}/close`
+  )

@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
-import { getProjectPullsApi, getPullFilesApi, getPrCommentsApi, createPrCommentApi, createPrCommentReplyApi, getRepoBranchesApi, createPrApi, mergePrApi } from '@/api/pullrequest'
+import { getProjectPullsApi, getPullFilesApi, getPrCommentsApi, createPrCommentApi, createPrCommentReplyApi, getRepoBranchesApi, createPrApi, mergePrApi, closePrApi } from '@/api/pullrequest'
 import type { PullFile, PullRequest, PrLineComment, MergePrBody } from '@/types/pullrequest'
 
 type TabState = 'open' | 'draft' | 'merged' | 'closed'
@@ -451,6 +451,47 @@ function MergeButton({ projectId, pr, onMerged }: { projectId: number; pr: PullR
   )
 }
 
+function CloseButton({ projectId, pr, onClosed }: { projectId: number; pr: PullRequest; onClosed: () => void }) {
+  const [confirm, setConfirm] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+
+  async function handleClose() {
+    setLoading(true)
+    setError('')
+    try {
+      await closePrApi(projectId, pr.number)
+      setConfirm(false)
+      onClosed()
+    } catch {
+      setError('PR 닫기에 실패했습니다.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (!confirm) {
+    return (
+      <button className="pr-close-btn" onClick={() => setConfirm(true)}>
+        Close
+      </button>
+    )
+  }
+
+  return (
+    <div className="pr-close-panel">
+      <span className="pr-close-confirm-text">이 PR을 닫으시겠습니까?</span>
+      <button className="pr-close-confirm-btn" onClick={handleClose} disabled={loading}>
+        {loading ? '처리 중...' : '확인'}
+      </button>
+      <button className="pr-merge-cancel-btn" onClick={() => { setConfirm(false); setError('') }} disabled={loading}>
+        취소
+      </button>
+      {error && <span className="pr-merge-error">{error}</span>}
+    </div>
+  )
+}
+
 function PrItem({ pr, projectId, onMerged, autoOpen }: { pr: PullRequest; projectId: number; onMerged: () => void; autoOpen?: boolean }) {
   const [showDiff, setShowDiff] = useState(autoOpen ?? false)
   const ref = useRef<HTMLDivElement>(null)
@@ -494,6 +535,9 @@ function PrItem({ pr, projectId, onMerged, autoOpen }: { pr: PullRequest; projec
               </button>
               {pr.state === 'OPEN' && (
                 <MergeButton projectId={projectId} pr={pr} onMerged={onMerged} />
+              )}
+              {(pr.state === 'OPEN' || pr.state === 'DRAFT') && (
+                <CloseButton projectId={projectId} pr={pr} onClosed={onMerged} />
               )}
               <a href={pr.htmlUrl} target="_blank" rel="noreferrer" className="pr-item-link">
                 GitHub ↗

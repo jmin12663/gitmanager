@@ -253,6 +253,33 @@ public class PullRequestService {
         }
     }
 
+    public void closePr(Long projectId, int prNumber, Long userId) {
+        validateMember(projectId, userId);
+
+        ProjectGithub github = projectGithubRepository.findById(projectId)
+                .orElseThrow(() -> new CustomException(ErrorCode.GITHUB_NOT_CONFIGURED));
+
+        String accessToken = jasyptStringEncryptor.decrypt(github.getOauthTokenEncrypted());
+        String owner = parseRepoOwner(github.getRepoUrl());
+        String repoName = github.getRepoName();
+
+        try {
+            restClient.patch()
+                    .uri("https://api.github.com/repos/{owner}/{repo}/pulls/{prNumber}",
+                            owner, repoName, prNumber)
+                    .header("Authorization", "Bearer " + accessToken)
+                    .header("Accept", "application/vnd.github+json")
+                    .body(Map.of("state", "closed"))
+                    .retrieve()
+                    .toBodilessEntity();
+        } catch (CustomException e) {
+            throw e;
+        } catch (Exception e) {
+            log.warn("[PR] PR close 실패. prNumber={}, error={}", prNumber, e.getMessage());
+            throw new CustomException(ErrorCode.GITHUB_API_ERROR);
+        }
+    }
+
     public void mergePr(Long projectId, int prNumber, MergePrRequest request, Long userId) {
         validateMember(projectId, userId);
 
