@@ -493,6 +493,7 @@ function CloseButton({ projectId, pr, onClosed }: { projectId: number; pr: PullR
 }
 
 function DraftToggleButton({ projectId, pr, onToggled }: { projectId: number; pr: PullRequest; onToggled: () => void }) {
+  const [confirm, setConfirm] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const toDraft = pr.state === 'OPEN'
@@ -502,6 +503,7 @@ function DraftToggleButton({ projectId, pr, onToggled }: { projectId: number; pr
     setError('')
     try {
       await convertDraftStateApi(projectId, pr.number, toDraft, pr.nodeId)
+      setConfirm(false)
       onToggled()
     } catch {
       setError(toDraft ? 'Draft 전환에 실패했습니다.' : 'Ready 전환에 실패했습니다.')
@@ -510,10 +512,24 @@ function DraftToggleButton({ projectId, pr, onToggled }: { projectId: number; pr
     }
   }
 
+  if (!confirm) {
+    return (
+      <button className="pr-close-btn" onClick={() => setConfirm(true)}>
+        {toDraft ? 'Draft로' : 'Ready for Review'}
+      </button>
+    )
+  }
+
   return (
-    <div className="pr-draft-toggle">
-      <button className="pr-draft-btn" onClick={handleToggle} disabled={loading}>
-        {loading ? '처리 중...' : toDraft ? 'Draft로' : 'Ready for Review'}
+    <div className="pr-close-panel">
+      <span className="pr-close-confirm-text">
+        {toDraft ? 'Draft로 전환하시겠습니까?' : 'Ready for Review로 전환하시겠습니까?'}
+      </span>
+      <button className="pr-close-confirm-btn" onClick={handleToggle} disabled={loading}>
+        {loading ? '처리 중...' : '확인'}
+      </button>
+      <button className="pr-merge-cancel-btn" onClick={() => { setConfirm(false); setError('') }} disabled={loading}>
+        취소
       </button>
       {error && <span className="pr-merge-error">{error}</span>}
     </div>
