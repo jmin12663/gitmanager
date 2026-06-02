@@ -506,7 +506,7 @@ function DraftToggleButton({ projectId, pr, onToggled }: { projectId: number; pr
       setConfirm(false)
       onToggled()
     } catch {
-      setError(toDraft ? 'Draft 전환에 실패했습니다.' : 'Ready 전환에 실패했습니다.')
+      setError(toDraft ? 'Draft 전환에 실패했습니다.' : 'OPEN 전환에 실패했습니다.')
     } finally {
       setLoading(false)
     }
@@ -515,7 +515,7 @@ function DraftToggleButton({ projectId, pr, onToggled }: { projectId: number; pr
   if (!confirm) {
     return (
       <button className="pr-close-btn" onClick={() => setConfirm(true)}>
-        {toDraft ? 'Draft로' : 'Ready for Review'}
+        {toDraft ? 'Draft' : 'OPEN'}
       </button>
     )
   }
