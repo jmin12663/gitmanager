@@ -12,6 +12,7 @@ export interface ReviewerInfo {
 }
 
 export interface PullRequest {
+  nodeId: string
   number: number
   title: string
   state: 'OPEN' | 'DRAFT' | 'MERGED' | 'CLOSED'

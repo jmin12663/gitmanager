@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
-import { getProjectPullsApi, getPullFilesApi, getPrCommentsApi, createPrCommentApi, createPrCommentReplyApi, getRepoBranchesApi, createPrApi, mergePrApi, closePrApi } from '@/api/pullrequest'
+import { getProjectPullsApi, getPullFilesApi, getPrCommentsApi, createPrCommentApi, createPrCommentReplyApi, getRepoBranchesApi, createPrApi, mergePrApi, closePrApi, convertDraftStateApi } from '@/api/pullrequest'
 import type { PullFile, PullRequest, PrLineComment, MergePrBody } from '@/types/pullrequest'
 
 type TabState = 'open' | 'draft' | 'merged' | 'closed'
@@ -492,6 +492,34 @@ function CloseButton({ projectId, pr, onClosed }: { projectId: number; pr: PullR
   )
 }
 
+function DraftToggleButton({ projectId, pr, onToggled }: { projectId: number; pr: PullRequest; onToggled: () => void }) {
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const toDraft = pr.state === 'OPEN'
+
+  async function handleToggle() {
+    setLoading(true)
+    setError('')
+    try {
+      await convertDraftStateApi(projectId, pr.number, toDraft, pr.nodeId)
+      onToggled()
+    } catch {
+      setError(toDraft ? 'Draft 전환에 실패했습니다.' : 'Ready 전환에 실패했습니다.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="pr-draft-toggle">
+      <button className="pr-draft-btn" onClick={handleToggle} disabled={loading}>
+        {loading ? '처리 중...' : toDraft ? 'Draft로' : 'Ready for Review'}
+      </button>
+      {error && <span className="pr-merge-error">{error}</span>}
+    </div>
+  )
+}
+
 function PrItem({ pr, projectId, onMerged, autoOpen }: { pr: PullRequest; projectId: number; onMerged: () => void; autoOpen?: boolean }) {
   const [showDiff, setShowDiff] = useState(autoOpen ?? false)
   const ref = useRef<HTMLDivElement>(null)
@@ -535,6 +563,9 @@ function PrItem({ pr, projectId, onMerged, autoOpen }: { pr: PullRequest; projec
               </button>
               {pr.state === 'OPEN' && (
                 <MergeButton projectId={projectId} pr={pr} onMerged={onMerged} />
+              )}
+              {(pr.state === 'OPEN' || pr.state === 'DRAFT') && (
+                <DraftToggleButton projectId={projectId} pr={pr} onToggled={onMerged} />
               )}
               {(pr.state === 'OPEN' || pr.state === 'DRAFT') && (
                 <CloseButton projectId={projectId} pr={pr} onClosed={onMerged} />

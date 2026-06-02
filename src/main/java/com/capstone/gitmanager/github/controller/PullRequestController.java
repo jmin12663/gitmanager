@@ -1,6 +1,7 @@
 package com.capstone.gitmanager.github.controller;
 
 import com.capstone.gitmanager.common.dto.ApiResponse;
+import com.capstone.gitmanager.github.dto.ConvertDraftRequest;
 import com.capstone.gitmanager.github.dto.CreatePrCommentRequest;
 import com.capstone.gitmanager.github.dto.CreatePrCommentReplyRequest;
 import com.capstone.gitmanager.github.dto.CreatePrRequest;
@@ -46,6 +47,17 @@ public class PullRequestController {
             @AuthenticationPrincipal Long userId
     ) {
         return ApiResponse.ok(pullRequestService.createPr(projectId, request, userId));
+    }
+
+    @PatchMapping("/api/projects/{projectId}/pulls/{prNumber}/draft")
+    public ApiResponse<Void> convertDraftState(
+            @PathVariable Long projectId,
+            @PathVariable int prNumber,
+            @RequestBody @Valid ConvertDraftRequest request,
+            @AuthenticationPrincipal Long userId
+    ) {
+        pullRequestService.convertDraftState(projectId, prNumber, request, userId);
+        return ApiResponse.ok(null);
     }
 
     @PatchMapping("/api/projects/{projectId}/pulls/{prNumber}/close")

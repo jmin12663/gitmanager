@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Map;
 
 public record PullRequestResponse(
+        String nodeId,
         int number,
         String title,
         String state,
@@ -57,6 +58,7 @@ public record PullRequestResponse(
         List<ReviewerInfo> reviewerInfos = buildReviewerInfos(pr, reviews);
 
         return new PullRequestResponse(
+                (String) pr.getOrDefault("node_id", ""),
                 ((Number) pr.get("number")).intValue(),
                 (String) pr.getOrDefault("title", ""),
                 state,

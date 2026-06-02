@@ -6,6 +6,7 @@ import com.capstone.gitmanager.board.repository.CardBranchRepository;
 import com.capstone.gitmanager.board.repository.CardRepository;
 import com.capstone.gitmanager.common.exception.CustomException;
 import com.capstone.gitmanager.common.exception.ErrorCode;
+import com.capstone.gitmanager.github.dto.ConvertDraftRequest;
 import com.capstone.gitmanager.github.dto.CreatePrCommentRequest;
 import com.capstone.gitmanager.github.dto.CreatePrCommentReplyRequest;
 import com.capstone.gitmanager.github.dto.CreatePrRequest;
@@ -306,6 +307,42 @@ public class PullRequestService {
             throw e;
         } catch (Exception e) {
             log.warn("[PR] 머지 실패. prNumber={}, error={}", prNumber, e.getMessage());
+            throw new CustomException(ErrorCode.GITHUB_API_ERROR);
+        }
+    }
+
+    public void convertDraftState(Long projectId, int prNumber, ConvertDraftRequest request, Long userId) {
+        validateMember(projectId, userId);
+
+        ProjectGithub github = projectGithubRepository.findById(projectId)
+                .orElseThrow(() -> new CustomException(ErrorCode.GITHUB_NOT_CONFIGURED));
+
+        String accessToken = jasyptStringEncryptor.decrypt(github.getOauthTokenEncrypted());
+
+        String mutation = Boolean.TRUE.equals(request.draft())
+                ? "mutation($id: ID!) { convertPullRequestToDraft(input: {pullRequestId: $id}) { pullRequest { isDraft } } }"
+                : "mutation($id: ID!) { markPullRequestReadyForReview(input: {pullRequestId: $id}) { pullRequest { isDraft } } }";
+
+        callGraphQL(mutation, Map.of("id", request.nodeId()), accessToken, prNumber);
+    }
+
+    private void callGraphQL(String mutation, Map<String, Object> variables, String token, int prNumber) {
+        try {
+            Map<String, Object> response = restClient.post()
+                    .uri("https://api.github.com/graphql")
+                    .header("Authorization", "Bearer " + token)
+                    .header("Accept", "application/vnd.github+json")
+                    .body(Map.of("query", mutation, "variables", variables))
+                    .retrieve()
+                    .body(new ParameterizedTypeReference<>() {});
+            if (response != null && response.containsKey("errors")) {
+                log.warn("[PR] GraphQL 오류. prNumber={}, errors={}", prNumber, response.get("errors"));
+                throw new CustomException(ErrorCode.GITHUB_API_ERROR);
+            }
+        } catch (CustomException e) {
+            throw e;
+        } catch (Exception e) {
+            log.warn("[PR] GraphQL 호출 실패. prNumber={}, error={}", prNumber, e.getMessage());
             throw new CustomException(ErrorCode.GITHUB_API_ERROR);
         }
     }

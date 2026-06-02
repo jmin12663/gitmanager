@@ -54,3 +54,9 @@ export const closePrApi = (projectId: number, prNumber: number) =>
   client.patch<{ success: boolean; data: null }>(
     `/projects/${projectId}/pulls/${prNumber}/close`
   )
+
+export const convertDraftStateApi = (projectId: number, prNumber: number, draft: boolean, nodeId: string) =>
+  client.patch<{ success: boolean; data: null }>(
+    `/projects/${projectId}/pulls/${prNumber}/draft`,
+    { draft, nodeId }
+  )
