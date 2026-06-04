@@ -64,11 +64,12 @@ CREATE TABLE pre_email_verifications (
 );
 
 -- Refresh Token
--- is_used: 1차 구현에서는 미사용, 8주차 RTR 적용 시 활성화
+-- is_used: 1차 구현에서는 항상 false 고정, 8주차 RTR 적용 시 true 전환 로직 추가
 CREATE TABLE refresh_tokens (
     id         BIGINT       NOT NULL AUTO_INCREMENT,
     user_id    BIGINT       NOT NULL,
     token_hash VARCHAR(255) NOT NULL UNIQUE,
+    is_used    BOOLEAN      NOT NULL DEFAULT FALSE,
     expires_at DATETIME(6)  NOT NULL,
     created_at DATETIME(6)  NOT NULL,
     PRIMARY KEY (id),

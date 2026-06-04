@@ -60,6 +60,9 @@
   - [x] 4-7: PR 생성 (`POST /api/projects/{projectId}/pulls`) — head/base 브랜치 선택, 제목/설명 입력 → GitHub에 직접 생성
   - [x] 4-8: PR 머지 (`PUT /api/projects/{projectId}/pulls/{prNumber}/merge`) — merge/squash/rebase 선택, 충돌 시 에러 안내
   - [x] 4-9: 카드 상세 PR 클릭 → 프로젝트 PR 페이지로 이동 (`?pr=번호` 쿼리 파라미터로 자동 탭 전환 + diff 펼침)
+  - [x] 4-10: PR 닫기 (`PATCH /api/projects/{projectId}/pulls/{prNumber}/close`) — Open PR → Closed 전환
+  - [x] 4-11: Open ↔ Draft 전환 (`PATCH /api/projects/{projectId}/pulls/{prNumber}/draft`) — nodeId 기반 GraphQL 변환
+  - [x] 4-12: 라인 코멘트 목록 조회 (`GET /api/projects/{projectId}/pulls/{prNumber}/comments`) — diff 뷰어에 기존 코멘트 표시
 - [ ] Docker 빌드
 - [ ] AWS 배포 (배포 전 체크리스트 → docs/DEPLOY.md)
 
@@ -93,8 +96,8 @@
 - [x] `src/store/` — AuthContext + AuthProvider (세션 복구)
 - [x] `src/types/project.ts` — Project, ProjectRole
 
-- [x] `src/api/pullrequest.ts` — getCardPullsApi / getProjectPullsApi / getPullFilesApi / createPrCommentApi / getRepoBranchesApi / createPrApi / mergePrApi
-- [x] `src/types/pullrequest.ts` — PullRequest (baseBranch 포함) / PullFile / ReviewerInfo / CreatePrCommentBody / CreatePrBody / MergePrBody
+- [x] `src/api/pullrequest.ts` — getCardPullsApi / getProjectPullsApi / getPullFilesApi / getPrCommentsApi / createPrCommentApi / createPrCommentReplyApi / getRepoBranchesApi / createPrApi / mergePrApi / closePrApi / convertDraftStateApi
+- [x] `src/types/pullrequest.ts` — PullRequest (nodeId·baseBranch·DRAFT state 포함) / PullFile / ReviewerInfo / PrLineComment / CreatePrCommentBody / CreatePrBody / MergePrBody
 - [x] `PullRequestsPage` — PR 생성 모달 (브랜치 드롭다운 / 제목·설명 입력), OPEN PR Merge 버튼 (방식 선택), `?pr=` 쿼리 파라미터로 자동 탭 전환 + diff 펼침
 - [x] `BoardPage` — 카드 상세 PR 제목 클릭 시 GitHub 대신 프로젝트 PR 페이지로 이동
 - [ ] 배포

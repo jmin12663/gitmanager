@@ -151,14 +151,17 @@ X-Hub-Signature-256 검증 (실패 → 403)
 PR 데이터는 DB 저장 안 함. 백엔드가 GitHub API 중계.
 
 ```
-GET  /api/projects/{projectId}/branches                       → 브랜치 목록 (DONE 카드 연결 브랜치 제외)
-GET  /api/projects/{projectId}/cards/{cardId}/pulls           → 카드 브랜치별 PR + reviewer
-GET  /api/projects/{projectId}/pulls?state=all                → 프로젝트 전체 PR + reviewer
-GET  /api/projects/{projectId}/pulls/{prNumber}/files         → 변경 파일 + patch
-POST /api/projects/{projectId}/pulls                          → PR 생성 (head/base 브랜치, 제목, 설명)
-PUT  /api/projects/{projectId}/pulls/{prNumber}/merge         → PR 머지 (merge/squash/rebase)
-POST /api/projects/{projectId}/pulls/{prNumber}/comments      → 라인 코멘트 GitHub 등록
-POST /api/projects/{projectId}/pulls/{prNumber}/comments/{id}/replies → 코멘트 답글
+GET   /api/projects/{projectId}/branches                                    → 브랜치 목록 (DONE 카드 연결 브랜치 제외)
+GET   /api/projects/{projectId}/cards/{cardId}/pulls                        → 카드 브랜치별 PR + reviewer
+GET   /api/projects/{projectId}/pulls?state=all                             → 프로젝트 전체 PR + reviewer
+GET   /api/projects/{projectId}/pulls/{prNumber}/files                      → 변경 파일 + patch
+GET   /api/projects/{projectId}/pulls/{prNumber}/comments                   → 라인 코멘트 목록 조회
+POST  /api/projects/{projectId}/pulls                                       → PR 생성 (head/base 브랜치, 제목, 설명)
+PUT   /api/projects/{projectId}/pulls/{prNumber}/merge                      → PR 머지 (merge/squash/rebase)
+PATCH /api/projects/{projectId}/pulls/{prNumber}/close                      → PR 닫기 (Open → Closed)
+PATCH /api/projects/{projectId}/pulls/{prNumber}/draft                      → Open ↔ Draft 전환 (nodeId 기반 GitHub GraphQL)
+POST  /api/projects/{projectId}/pulls/{prNumber}/comments                   → 라인 코멘트 GitHub 등록
+POST  /api/projects/{projectId}/pulls/{prNumber}/comments/{id}/replies      → 코멘트 답글
 ```
 
 - 모든 메서드: `validateMember` → `projectGithubRepository` → Jasypt 복호화 토큰으로 GitHub API 호출
