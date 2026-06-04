@@ -2,8 +2,15 @@ package com.capstone.gitmanager.project.service;
 
 import com.capstone.gitmanager.auth.entity.User;
 import com.capstone.gitmanager.auth.repository.UserRepository;
+import com.capstone.gitmanager.board.repository.CardAssigneeRepository;
+import com.capstone.gitmanager.board.repository.CardBranchRepository;
+import com.capstone.gitmanager.board.repository.CardRepository;
+import com.capstone.gitmanager.board.repository.CommentRepository;
+import com.capstone.gitmanager.board.repository.CommitLogRepository;
+import com.capstone.gitmanager.calendar.repository.ScheduleRepository;
 import com.capstone.gitmanager.common.exception.CustomException;
 import com.capstone.gitmanager.common.exception.ErrorCode;
+import com.capstone.gitmanager.github.repository.ProjectGithubRepository;
 import com.capstone.gitmanager.project.dto.*;
 import com.capstone.gitmanager.project.entity.Project;
 import com.capstone.gitmanager.project.entity.ProjectRole;
@@ -29,6 +36,13 @@ public class ProjectService {
     private final ProjectRepository projectRepository;
     private final UserProjectRepository userProjectRepository;
     private final UserRepository userRepository;
+    private final CardRepository cardRepository;
+    private final CardBranchRepository cardBranchRepository;
+    private final CardAssigneeRepository cardAssigneeRepository;
+    private final CommentRepository commentRepository;
+    private final CommitLogRepository commitLogRepository;
+    private final ScheduleRepository scheduleRepository;
+    private final ProjectGithubRepository projectGithubRepository;
 
     @Transactional
     public ProjectResponse createProject(Long userId, ProjectCreateRequest request) {
@@ -90,6 +104,7 @@ public class ProjectService {
             throw new CustomException(ErrorCode.PROJECT_HAS_MEMBERS);
         }
 
+        cleanupProjectData(projectId);
         userProjectRepository.deleteAll(members);
         projectRepository.delete(project);
     }
@@ -166,6 +181,7 @@ public class ProjectService {
             List<UserProject> members = userProjectRepository.findByProject(project);
             if (members.size() == 1) {
                 // 혼자라면 프로젝트 삭제
+                cleanupProjectData(projectId);
                 userProjectRepository.delete(up);
                 projectRepository.delete(project);
                 return;
@@ -183,6 +199,17 @@ public class ProjectService {
         }
 
         userProjectRepository.delete(up);
+    }
+
+    // FK 의존 순서: commitLogs → comments → cardAssignees → cardBranches → cards → schedules → projectGithub
+    private void cleanupProjectData(Long projectId) {
+        commitLogRepository.deleteAllByProjectId(projectId);
+        commentRepository.deleteAllByProjectId(projectId);
+        cardAssigneeRepository.deleteAllByProjectId(projectId);
+        cardBranchRepository.deleteAllByProjectId(projectId);
+        cardRepository.deleteAllByProjectId(projectId);
+        scheduleRepository.deleteAllByProjectId(projectId);
+        projectGithubRepository.findById(projectId).ifPresent(projectGithubRepository::delete);
     }
 
     // --- private helpers ---

@@ -2,6 +2,7 @@ package com.capstone.gitmanager.board.repository;
 
 import com.capstone.gitmanager.board.entity.Comment;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -17,4 +18,8 @@ public interface CommentRepository extends JpaRepository<Comment, Long> {
 
     @Query("SELECT COUNT(c) FROM Comment c WHERE c.card.id = :cardId")
     long countByCardId(@Param("cardId") Long cardId);
+
+    @Modifying
+    @Query(value = "DELETE FROM comments WHERE card_id IN (SELECT id FROM cards WHERE project_id = :projectId)", nativeQuery = true)
+    void deleteAllByProjectId(@Param("projectId") Long projectId);
 }

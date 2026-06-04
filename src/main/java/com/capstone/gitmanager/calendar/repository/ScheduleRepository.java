@@ -2,6 +2,7 @@ package com.capstone.gitmanager.calendar.repository;
 
 import com.capstone.gitmanager.calendar.entity.Schedule;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -17,4 +18,8 @@ public interface ScheduleRepository extends JpaRepository<Schedule, Long> {
             @Param("from") LocalDate from,
             @Param("to") LocalDate to
     );
+
+    @Modifying
+    @Query("DELETE FROM Schedule s WHERE s.projectId = :projectId")
+    void deleteAllByProjectId(@Param("projectId") Long projectId);
 }
