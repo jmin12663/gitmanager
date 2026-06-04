@@ -482,7 +482,7 @@ export default function AppLayout() {
 
         <div className="page-container">
           <div className="gm-page">
-            <Outlet context={{ setUndoneTodoCount }} />
+            <Outlet context={{ setUndoneTodoCount, removeProject: (id: number) => setProjects(prev => prev.filter(p => p.id !== id)) }} />
           </div>
         </div>
       </div>

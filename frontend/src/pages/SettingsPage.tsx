@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
+import { useParams, useNavigate, useSearchParams, useOutletContext } from 'react-router-dom'
 import { useAuth } from '@/store/authStore'
 import {
   getInviteCodeApi,
@@ -107,6 +107,7 @@ export default function SettingsPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const pid = Number(projectId)
   const { user, isLoading: authLoading } = useAuth()
+  const { removeProject } = useOutletContext<{ removeProject: (id: number) => void }>()
 
   const [members, setMembers] = useState<Member[]>([])
   const [inviteCode, setInviteCode] = useState<string | null>(null)
@@ -251,6 +252,7 @@ export default function SettingsPage() {
     if (name !== '삭제') return
     try {
       await deleteProjectApi(pid)
+      removeProject(pid)
       navigate('/todo')
     } catch (err: unknown) {
       const code = (err as { response?: { data?: { error?: { code?: string } } } })?.response?.data?.error?.code
