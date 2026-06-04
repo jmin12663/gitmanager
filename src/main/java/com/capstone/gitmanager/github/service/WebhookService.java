@@ -61,7 +61,7 @@ public class WebhookService {
 
         // 이미 연결된 카드가 있으면 생성하지 않음
         boolean alreadyLinked = cardBranchRepository
-                .findByRepoNameAndIdBranchName(repoName, branchName)
+                .findFirstByRepoNameAndIdBranchName(repoName, branchName)
                 .isPresent();
         if (alreadyLinked) return;
 
@@ -87,7 +87,7 @@ public class WebhookService {
         String branchName = extractBranchName(payload.ref);
         String repoName = payload.repository.name;
 
-        cardBranchRepository.findByRepoNameAndIdBranchName(repoName, branchName)
+        cardBranchRepository.findFirstByRepoNameAndIdBranchName(repoName, branchName)
                 .ifPresent(cardBranch -> {
                     Card card = cardBranch.getCard();
                     boolean statusChanged = false;
@@ -125,7 +125,7 @@ public class WebhookService {
         String branchName = payload.ref;
         String repoName = payload.repository.name;
 
-        cardBranchRepository.findByRepoNameAndIdBranchName(repoName, branchName)
+        cardBranchRepository.findFirstByRepoNameAndIdBranchName(repoName, branchName)
                 .ifPresent(cardBranchRepository::delete);
     }
 
@@ -141,7 +141,7 @@ public class WebhookService {
 
         log.info("[Webhook] PR review 수신. branch={}, reviewer={}, state={}", branchName, reviewer, reviewState);
 
-        cardBranchRepository.findByRepoNameAndIdBranchName(repoName, branchName)
+        cardBranchRepository.findFirstByRepoNameAndIdBranchName(repoName, branchName)
                 .ifPresent(cardBranch -> {
                     Long cardId = cardBranch.getCard().getId();
                     Long projectId = cardBranch.getCard().getProjectId();
@@ -156,7 +156,7 @@ public class WebhookService {
         String branchName = payload.pullRequest.head.ref;
         String repoName = payload.repository.name;
 
-        cardBranchRepository.findByRepoNameAndIdBranchName(repoName, branchName)
+        cardBranchRepository.findFirstByRepoNameAndIdBranchName(repoName, branchName)
                 .ifPresent(cardBranch -> {
                     Card card = cardBranch.getCard();
                     card.markMerged(LocalDateTime.now());

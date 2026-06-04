@@ -77,7 +77,7 @@ public class GithubSyncService {
                 if (head == null) continue;
                 String branchName = (String) head.get("ref");
 
-                cardBranchRepository.findByRepoNameAndIdBranchName(repoName, branchName)
+                cardBranchRepository.findFirstByRepoNameAndIdBranchName(repoName, branchName)
                         .ifPresent(cardBranch -> {
                             if (cardBranch.getCard().getStatus() != CardStatus.DONE) {
                                 cardBranch.getCard().markMerged(LocalDateTime.now());
@@ -93,7 +93,7 @@ public class GithubSyncService {
     private void syncBranch(String owner, String repoName, String accessToken,
                             Long projectId, String branchName, String defaultBranch) {
         // 이미 연결된 브랜치면 skip
-        if (cardBranchRepository.findByRepoNameAndIdBranchName(repoName, branchName).isPresent()) {
+        if (cardBranchRepository.findFirstByRepoNameAndIdBranchName(repoName, branchName).isPresent()) {
             log.debug("[Sync] 이미 연결된 브랜치 skip. branch={}", branchName);
             return;
         }
