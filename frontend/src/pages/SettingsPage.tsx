@@ -252,7 +252,14 @@ export default function SettingsPage() {
     try {
       await deleteProjectApi(pid)
       navigate('/todo')
-    } catch {}
+    } catch (err: unknown) {
+      const code = (err as { response?: { data?: { error?: { code?: string } } } })?.response?.data?.error?.code
+      if (code === 'PROJECT_HAS_MEMBERS') {
+        alert('다른 멤버가 있을 때는 프로젝트를 삭제할 수 없습니다.\n먼저 모든 멤버를 추방하세요.')
+      } else {
+        alert('프로젝트 삭제에 실패했습니다.')
+      }
+    }
   }
 
   if (authLoading || loading) {
@@ -501,8 +508,18 @@ export default function SettingsPage() {
             <div>
               <div style={{ fontSize: 13, color: 'var(--gm-text1)' }}>프로젝트 삭제</div>
               <div style={{ fontSize: 12, color: 'var(--gm-text3)', marginTop: 2 }}>삭제 후 복구할 수 없습니다. 모든 카드, 일정, 댓글이 함께 삭제됩니다.</div>
+              {members.filter(m => m.role !== 'OWNER').length > 0 && (
+                <div style={{ fontSize: 12, color: 'var(--gm-red)', marginTop: 4 }}>
+                  다른 멤버가 있을 때는 삭제할 수 없습니다. 먼저 모든 멤버를 추방하세요.
+                </div>
+              )}
             </div>
-            <button className="danger-inline-btn" onClick={handleDeleteProject}>
+            <button
+              className="danger-inline-btn"
+              onClick={handleDeleteProject}
+              disabled={members.filter(m => m.role !== 'OWNER').length > 0}
+              style={{ opacity: members.filter(m => m.role !== 'OWNER').length > 0 ? 0.4 : 1, cursor: members.filter(m => m.role !== 'OWNER').length > 0 ? 'not-allowed' : 'pointer' }}
+            >
               프로젝트 삭제
             </button>
           </div>

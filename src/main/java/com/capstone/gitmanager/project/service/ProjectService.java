@@ -85,7 +85,12 @@ public class ProjectService {
         Project project = getProjectOrThrow(projectId);
         requireOwner(user, project);
 
-        userProjectRepository.deleteAll(userProjectRepository.findByProject(project));
+        List<UserProject> members = userProjectRepository.findByProject(project);
+        if (members.size() > 1) {
+            throw new CustomException(ErrorCode.PROJECT_HAS_MEMBERS);
+        }
+
+        userProjectRepository.deleteAll(members);
         projectRepository.delete(project);
     }
 
