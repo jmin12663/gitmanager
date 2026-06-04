@@ -47,6 +47,8 @@ public enum ErrorCode {
     WEBHOOK_SIGNATURE_INVALID(HttpStatus.FORBIDDEN, "WEBHOOK_SIGNATURE_INVALID", "Webhook 서명이 유효하지 않습니다."),
     GITHUB_OAUTH_FAILED(HttpStatus.BAD_REQUEST, "GITHUB_OAUTH_FAILED", "GitHub OAuth 인증에 실패했습니다."),
     GITHUB_PR_CONFLICT(HttpStatus.UNPROCESSABLE_ENTITY, "GITHUB_PR_CONFLICT", "PR 머지 충돌이 발생했습니다. 로컬에서 충돌을 해결 후 다시 시도해 주세요."),
+    GITHUB_PR_DUPLICATE(HttpStatus.CONFLICT, "GITHUB_PR_DUPLICATE", "이미 동일한 브랜치로 열린 PR이 존재합니다."),
+    GITHUB_PR_NO_COMMITS(HttpStatus.UNPROCESSABLE_ENTITY, "GITHUB_PR_NO_COMMITS", "두 브랜치 사이에 차이가 없어 PR을 생성할 수 없습니다."),
     GITHUB_API_ERROR(HttpStatus.BAD_REQUEST, "GITHUB_API_ERROR", "GitHub API 요청에 실패했습니다."),
 
     // File
