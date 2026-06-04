@@ -247,11 +247,11 @@ public class PullRequestService {
         } catch (HttpClientErrorException e) {
             log.warn("[PR] PR 생성 실패. head={}, base={}, status={}, error={}",
                     request.head(), request.base(), e.getStatusCode(), e.getMessage());
-            String body = e.getResponseBodyAsString();
-            if (body.contains("A pull request already exists")) {
+            String errorBody = e.getResponseBodyAsString();
+            if (errorBody.contains("A pull request already exists")) {
                 throw new CustomException(ErrorCode.GITHUB_PR_DUPLICATE);
             }
-            if (body.contains("No commits between")) {
+            if (errorBody.contains("No commits between")) {
                 throw new CustomException(ErrorCode.GITHUB_PR_NO_COMMITS);
             }
             throw new CustomException(ErrorCode.GITHUB_API_ERROR);
